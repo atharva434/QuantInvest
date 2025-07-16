@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Option Chain Dashboard</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" />
+</head>
+<style>
+  /* Hide the actual radio buttons */
+input[type="radio"].btn-check {
+  display: none;
+}
+
+/* Style the labels to look like buttons */
+.radio-buttons label {
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s, color 0.3s;
+  margin-right: 10px;
+  
+}
+
+/* Default gray color when not selected */
+.radio-buttons label {
+  background-color: lightgray;
+  color: #333;
+}
+
+/* Style for Call button (green) */
+.radio-buttons input[type="radio"]:checked + label.btn-outline-success {
+  background-color: green;
+  color: white;
+}
+
+/* Style for Put button (purple) */
+.radio-buttons input[type="radio"]:checked + label.btn-outline-purple {
+  background-color: purple;
+  color: white;
+}
+
+/* Style for "Call" and "Put" buttons */
+.radio-buttons label.btn-outline-success {
+  border: 2px solid green;
+}
+
+.radio-buttons label.btn-outline-purple {
+  border: 2px solid purple;
+}
+
+/* Change background color when button is clicked */
+.radio-buttons label:hover {
+  opacity: 0.8;
+}
+.radio-buttons {
+  display: flex;
+  justify-content: space-evenly;
+}
+.navbar {
+  margin-bottom: 20px;
+}
+</style>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+        <a class="navbar-brand" href="/">ALGOTRADING</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ml-auto">
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'open_positions' %}">Open Positions</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'portfolio' %}">Open Positions</a>
+            </li>
+                <li class="nav-item active">
+                  <a class="nav-link" href="{% url 'expiry' %}">Add Expiry</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/stockexpiry/">Add StockExpiry</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="/stocks/">AddStock</a>
+              </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'full_table' %}">OptionChain</a>
+                </li>
+                <li class="nav-item">
+                          <a class="nav-link" href="{% url 'analysis' %}">Analyse</a>
+                      </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="{% url 'logout' %}">Logout</a>
+              </li>
+                
+                <!-- You can add more links as needed -->
+            </ul>
+        </div>
+    </div>
+</nav>
+  <div class="container mt-5">
+    <form method="post" action="{% url 'get_option_chain' %}" class="p-4 shadow rounded bg-light">
+      {% csrf_token %}
+
+      <!-- Top Buttons -->
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4">
+        <div class="d-flex gap-2 mb-2 mb-md-0">
+          <button type="button" class="btn btn-primary px-4 me-2" id="refreshBtn">Refresh Selected</button>
+          <button type="button" class="btn btn-secondary me-2" id="selectAllBtn">Select All</button>
+          <a href="{% url 'full_table' %}" class="btn btn-outline-info">View Existing Option Chain</a>
+        </div>
+        <input type="text" id="stockSearch" class="form-control w-50" placeholder="Search stock name..." />
+      </div>
+
+      <!-- Table Headers -->
+      <div class="row font-weight-bold text-center mb-3 border-bottom pb-2">
+        <div class="col-md-1">Select</div>
+        <div class="col-md-4">Stock Name</div>
+        <div class="col-md-4">Expiry Date</div>
+        <div class="col-md-3">Right</div>
+      </div>
+      
+      <!-- Stock List -->
+      <div id="stockList">
+        {% for item in stock_data %}
+          <div class="row align-items-center text-center mb-2 stock-entry">
+            <div class="col-md-1">
+              <input type="checkbox" class="stock-checkbox" name="selected_{{ forloop.counter }}" value="{{ item.stock_code }}">
+            </div>
+            <input type="hidden" name="stock_id_{{ forloop.counter }}" value="{{ item.stock_id }}">
+            <div class="col-md-4">
+              <input type="text" class="form-control stock-name" value="{{ item.stock_name }}" readonly>
+            </div>
+            <div class="col-md-4">
+              <input type="datetime" class="form-control" name="expiry_date_{{ forloop.counter }}" value="{{ item.expiry_date }}" readonly>
+            </div>
+            <div class="col-md-3">
+              <!-- Radio Buttons styled as Buttons -->
+              <div class="radio-buttons">
+                <input type="radio" class="btn-check" name="right_{{ forloop.counter }}" value="call" id="call_{{ forloop.counter }}">
+                <label class="btn btn-outline-success" for="call_{{ forloop.counter }}">Call</label>
+                
+                <input type="radio" class="btn-check" name="right_{{ forloop.counter }}" value="put" id="put_{{ forloop.counter }}">
+                <label class="btn btn-outline-purple" for="put_{{ forloop.counter }}">Put</label>
+              </div>
+            </div>
+            <input type="hidden" name="stock_code_{{ forloop.counter }}" value="{{ item.stock_code }}">
+            <input type="hidden" name="total_items" value="{{ stock_data|length }}">
+          </div>
+        {% endfor %}
+        <input type="hidden" name="total_items" value="{{ stock_data|length }}">
+      </div>
+      
+
+  <!-- Scripts -->
+  <script>
+    // Search filter
+    document.getElementById("stockSearch").addEventListener("input", function () {
+        const searchText = this.value.toLowerCase();
+        const entries = document.querySelectorAll(".stock-entry");
+        entries.forEach(entry => {
+          const name = entry.querySelector(".stock-name").value.toLowerCase();
+          if (name.includes(searchText)) {
+            entry.classList.remove("d-none");
+          } else {
+            entry.classList.add("d-none");
+          }
+        });
+      });
+
+    // Select / Deselect All
+    let allSelected = false;
+    document.getElementById("selectAllBtn").addEventListener("click", function () {
+      allSelected = !allSelected;
+      const checkboxes = document.querySelectorAll(".stock-checkbox");
+      checkboxes.forEach(cb => cb.checked = allSelected);
+      this.textContent = allSelected ? "Deselect All" : "Select All";
+    });
+
+    // Validate checkbox selection and radio button selection
+    document.getElementById("calculateBtn").addEventListener("click", function () {
+      const selectedCheckboxes = document.querySelectorAll(".stock-checkbox:checked");
+      if (selectedCheckboxes.length === 0) {
+        alert("Please select at least one stock.");
+        return;
+      }
+
+      let validSelection = true;
+      selectedCheckboxes.forEach(checkbox => {
+        const row = checkbox.closest(".stock-entry");
+        const radioButtons = row.querySelectorAll("input[type='radio']");
+        const selectedRadio = Array.from(radioButtons).some(rb => rb.checked);
+        if (!selectedRadio) {
+          validSelection = false;
+        }
+      });
+
+      if (!validSelection) {
+        alert("Please select either 'Call' or 'Put' for each selected stock.");
+        return;
+      }
+
+      // Submit the form if valid
+      document.querySelector("form").submit();
+    });
+  </script>
+  <script>
+    document.getElementById("refreshBtn").addEventListener("click", function () {
+      const selectedCheckboxes = document.querySelectorAll(".stock-checkbox:checked");
+      if (selectedCheckboxes.length === 0) {
+        alert("Please select at least one stock.");
+        return;
+      }
+
+      let validSelection = true;
+      selectedCheckboxes.forEach(checkbox => {
+        const row = checkbox.closest(".stock-entry");
+        const radioButtons = row.querySelectorAll("input[type='radio']");
+        const selectedRadio = Array.from(radioButtons).some(rb => rb.checked);
+        if (!selectedRadio) {
+          validSelection = false;
+        }
+      });
+
+      if (!validSelection) {
+        alert("Please select either 'Call' or 'Put' for each selected stock.");
+        return;
+      }
+
+      document.querySelector("form").submit();
+    });
+    {% if breeze_failed %}
+      let sessionId = prompt("Breeze failed. Please enter a valid session token:");
+      if (sessionId) {
+        fetch("{% url 'set_session_token' %}", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token }}",
+          },
+          body: JSON.stringify({ session_token: sessionId })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === "ok") {
+            alert("Session token updated. Please try again.");
+            location.reload();
+          } else {
+            alert("Failed to update session token.");
+          }
+        });
+      }
+    {% endif %}
+
+  </script>
+</body>
+</html>

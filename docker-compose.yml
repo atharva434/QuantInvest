@@ -1,0 +1,44 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:13
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_DB: algotrading
+      POSTGRES_USER: atharvapurohit
+      POSTGRES_PASSWORD: 1234
+
+  backend:
+    build: ./quantedgeapi
+    command: >
+      sh -c "python manage.py migrate &&
+             python load_stock.py &&
+             python manage.py apply_sql_procs &&
+             python load_csv_daily.py &&
+             python manage.py runserver 0.0.0.0:8002"
+    volumes:
+      - ./quantedgeapi:/code
+    ports:
+      - "8002:8002"
+    env_file:
+      - ./quantedgeapi/.env
+    depends_on:
+      - db
+
+  frontend:
+    build: ./algoapi
+    command: >
+      sh -c "python manage.py runserver 0.0.0.0:8003"
+    volumes:
+      - ./algoapi:/code
+    ports:
+      - "8003:8003"
+    environment:
+      BACKEND_URL: http://backend:8002
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

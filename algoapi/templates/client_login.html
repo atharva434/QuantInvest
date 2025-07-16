@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <title></title>
+    <style>
+      .center-content {
+        min-height: 100vh; /* Ensure the container takes at least the full viewport height */
+      }
+      .btn {
+    background: linear-gradient(to bottom right, #e710ea, #2b68e0);
+    border: 2px solid #5356e3;
+    font-weight: bold;
+    padding: 5px 20px;
+    border-radius: 30px;
+    color: white; /* Set text color to transparent */
+    cursor: pointer;
+    position: relative;
+}
+    </style>
+  </head>
+  <body>
+    <div class="center-content d-flex justify-content-center align-items-center">
+      <div>
+        <section>
+          <div class="container-fluid h-custom">
+            <div class="row">
+              <div class="col-md-9 col-lg-6 col-xl-5">
+                <img src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-login-form/draw1.webp" class="img-fluid" alt="Sample image">
+              </div>
+              <div class="col-md-8 col-lg-6 col-xl-4 offset-xl-1 mt-4">
+                <form method="post">
+                  {% csrf_token %}
+                  <h2>Login</h2>
+
+                  <!-- Username Field -->
+                  <div class="form-outline mb-4 mt-4">
+                    <label class="form-label" for="form3Example3">Username:</label>
+                    <input type="text" name="username" id="form3Example3" class="form-control" placeholder="Enter your username">
+                  </div>
+
+                  <!-- Password Field -->
+                  <div class="form-outline mb-3">
+                    <label class="form-label" for="form3Example4">Password:</label>
+                    <input type="password" name="password" id="form3Example4" class="form-control" placeholder="Enter your password">
+                  </div>
+
+                  <div class="form-outline mb-3">
+                    <label class="form-label" for="form3Example4">Session id:</label>
+                    <input type="text" name="session_token" id="form3Example4" class="form-control" placeholder="Enter your session id ">
+                  </div>
+
+                  <div class="text-center text-lg-start mt-4 pt-2">
+                    <button type="submit" name="" class="btn btn-primary btn-lg" value="login" style="padding-left: 2.5rem; padding-right: 2.5rem;">Login</button>
+                    <p class="small fw-bold mt-2 pt-1 mb-0">Don't have an account? Register <a href="/client_registration">here</a>
+                  </p>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </body>
+
+</html>

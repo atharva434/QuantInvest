@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stock Form</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    
+<div class="container mt-5">
+    <h2 class="mb-4">Stock Form</h2>
+    <form method="post" class="border p-4 rounded shadow-sm">
+        {% csrf_token %}
+
+        <div class="mb-3">
+            <label for="stock_code" class="form-label">Stock Code</label>
+            <input type="text" class="form-control" id="stock_code" name="stock_code" value="{{ form.stock_code.value|default:'' }}">
+        </div>
+
+        <div class="mb-3">
+            <label for="stock_name" class="form-label">Stock Name</label>
+            <input type="text" class="form-control" id="stock_name" name="stock_name" value="{{ form.stock_name.value|default:'' }}">
+        </div>
+
+        <div class="mb-3">
+            <label for="lot_size" class="form-label">Lot Size</label>
+            <input type="number" class="form-control" id="lot_size" name="lot_size" value="{{ form.lot_size.value|default:'' }}">
+        </div>
+
+        <div class="mb-3">
+            <label for="exchange_code" class="form-label">Exchange Code</label>
+            <select class="form-select" id="exchange_code" name="exchange_code">
+                {% for code, name in form.fields.exchange_code.choices %}
+                    <option value="{{ code }}" {% if form.exchange_code.value == code %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="stock_type" class="form-label">Stock Type</label>
+            <select class="form-select" id="stock_type" name="stock_type">
+                {% for code, name in form.fields.stock_type.choices %}
+                    <option value="{{ code }}" {% if form.stock_type.value == code %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="fno_exchange_code" class="form-label">FNO Exchange Code</label>
+            <input type="text" class="form-control" id="fno_exchange_code" name="fno_exchange_code" value="{{ form.fno_exchange_code.value|default:'' }}">
+        </div>
+        <a href="{% url 'stock_list' %}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">Save</button>
+        
+    </form>
+</div>
+</body>
+</html>

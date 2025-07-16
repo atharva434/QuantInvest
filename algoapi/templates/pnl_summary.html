@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+      body {
+        background-color: #f8f9fa;
+      }
+      h2 {
+        text-align: center;
+        margin-top: 20px;
+        color: #343a40;
+      }
+      .container2 {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      }
+      table th {
+        text-align: center;
+        background-color: #343a40;
+        color: white;
+      }
+      table td {
+        vertical-align: middle;
+      }
+      .table-responsive {
+        overflow-y: auto;
+        max-height: 70vh;
+      }
+      .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #343a40;
+        z-index: 2;
+      }
+    </style>
+</head>
+<body>
+      <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+        <a class="navbar-brand" href="/">ALGOTRADING</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ml-auto">
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'open_positions' %}">Open Positions</a>
+            </li>
+            <li class="nav-item active">
+                <a class="nav-link" href="{% url 'open_positions' %}">Portfolio</a>
+            </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="{% url 'expiry' %}">Add Expiry</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/stockexpiry/">Add StockExpiry</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="/stocks/">AddStock</a>
+              </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'full_table' %}">OptionChain</a>
+                </li>
+                <li class="nav-item">
+                          <a class="nav-link" href="{% url 'analysis' %}">Analyse</a>
+                      </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="{% url 'logout' %}">Logout</a>
+              </li>
+                
+                <!-- You can add more links as needed -->
+            </ul>
+        </div>
+    </div>
+</nav>
+    <div class="container2 mt-5">
+      <h2>Portfolio</h2>
+      <div class="table-responsive">
+        <table class="table table-bordered table-striped">
+        <thead>
+          <tr>
+            <th>Contract</th>
+            <th>Action</th>
+            <th>Qty</th>
+            <th>Avg Price</th>
+            <th>LTP</th>
+            <th>Realized P&L</th>
+            <th>Unrealized P&L</th>
+            <th>Total P&L</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in df %}
+            <tr>
+              <td>{{row.product_type}}-{{ row.stock_code }}-{{row.expiry_date}}-{{row.strike_price}}-{{row.right}}</td>
+              <td>{{ row.action }}</td>
+              <td>{{ row.quantity }}</td>
+              <td>₹{{ row.average_price }}</td>
+              <td>{% if row.ltp %}₹{{ row.ltp }}{% else %}—{% endif %}</td>
+              <td>
+                {% if row.realizedpl %}
+                  <span style="color:{% if row.realizedpl > 0 %}green{% elif row.realizedpl < 0 %}red{% else %}black{% endif %};">
+                    ₹{{ row.realizedpl }}
+                  </span>
+                {% else %}—{% endif %}
+              </td>
+              <td>
+                {% if row.PL %}
+                  <span style="color:{% if row.PL > 0 %}green{% elif row.PL < 0 %}red{% else %}black{% endif %};">
+                    ₹{{ row.PL }}
+                  </span>
+                {% else %}—{% endif %}
+              </td>
+              <td>
+                {% if row.realizedpl is not None and row.PL is not None %}
+                  {% with total_pnl=row.realizedpl|add:row.PL %}
+                    <span style="color:{% if total_pnl > 0 %}green{% elif total_pnl < 0 %}red{% else %}black{% endif %};">
+                      ₹{{ total_pnl }}
+                    </span>
+                  {% endwith %}
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          <tr>
+  <td colspan="5"><strong>Total</strong></td>
+  <td>
+    <span style="color:{% if total_realized > 0 %}green{% elif total_realized < 0 %}red{% else %}black{% endif %};">
+      ₹{{ total_realized }}
+    </span>
+  </td>
+  <td>
+    <span style="color:{% if total_unrealized > 0 %}green{% elif total_unrealized < 0 %}red{% else %}black{% endif %};">
+      ₹{{ total_unrealized }}
+    </span>
+  </td>
+  <td>
+    <span style="color:{% if total_pnl > 0 %}green{% elif total_pnl < 0 %}red{% else %}black{% endif %};">
+      ₹{{ total_pnl }}
+    </span>
+  </td>
+</tr>
+        </tbody>
+        </table>
+      </div>
+    </div>
+</body>
+</html>

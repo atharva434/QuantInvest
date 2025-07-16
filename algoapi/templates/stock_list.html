@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stock List</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">ALGOTRADING</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ml-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'open_positions' %}">Open Positions</a>
+                    </li>
+                    <li class="nav-item">
+                    <a class="nav-link" href="{% url 'portfolio' %}">Portfolio</a>
+                </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'expiry' %}">Add Expiry</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/stockexpiry/">Add StockExpiry</a>
+                    </li>
+                    <li class="nav-item active">
+                      <a class="nav-link" href="/stocks/">AddStock</a>
+                  </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'full_table' %}">OptionChain</a>
+                    </li>
+                    <li class="nav-item">
+                          <a class="nav-link" href="{% url 'analysis' %}">Analyse</a>
+                      </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'logout' %}">Logout</a>
+                    </li>
+                    
+                    <!-- You can add more links as needed -->
+                </ul>
+            </div>
+        </div>
+    </nav>
+<div class="container py-5">
+    <h2 class="mb-4">📈 All Stocks</h2>
+
+    <!-- 🔍 Search Box -->
+    <div class="mb-3">
+        <input type="text" id="stockSearch" class="form-control" placeholder="Search by stock name...">
+    </div>
+
+    <div class="d-flex justify-content-end mb-3">
+        <a href="{% url 'stock_create' %}" class="btn btn-success">➕ Add Stock</a>
+    </div>
+
+    <table class="table table-bordered table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Lot Size</th>
+                <th>Exchange</th>
+                <th>Type</th>
+                <th>F&O Exchange</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="stockTableBody">
+        {% for stock in stocks %}
+            <tr class="option-row">
+                <td>{{ stock.stock_code }}</td>
+                <td class="stock-name">{{ stock.stock_name }}</td>
+                <td>{{ stock.lot_size }}</td>
+                <td>{{ stock.exchange_code }}</td>
+                <td>{{ stock.stock_type }}</td>
+                <td>{{ stock.fno_exchange_code }}</td>
+                <td>
+                    <a href="{% url 'stock_update' stock.id %}" class="btn btn-sm btn-warning">✏️ Edit</a>
+                    <a href="{% url 'stock_delete' stock.id %}" class="btn btn-sm btn-danger">🗑️ Delete</a>
+                </td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="7" class="text-center">No stocks found.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+  document.getElementById("stockSearch").addEventListener("input", function () {
+      const searchText = this.value.toLowerCase();
+      document.querySelectorAll(".option-row").forEach(row => {
+          const stockName = row.querySelector(".stock-name").textContent.toLowerCase();
+          row.style.display = stockName.includes(searchText) ? "" : "none";
+      });
+  });
+</script>
+
+</body>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
+</html>

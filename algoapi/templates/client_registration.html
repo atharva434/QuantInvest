@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <title></title>
+    <style>
+      .center-content {
+        min-height: 100vh; /* Ensure the container takes at least the full viewport height */
+      }
+      .btn {
+        background: linear-gradient(to bottom right, #e710ea, #2b68e0);
+        border: 2px solid #5356e3;
+        font-weight: bold;
+        padding: 5px 20px;
+        border-radius: 30px;
+        color: white; /* Set text color to transparent */
+        cursor: pointer;
+        position: relative;
+      }
+      .custom-jumbotron {
+        padding: 20px; /* Adjust the padding to make it smaller */
+          background-color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="center-content d-flex justify-content-center align-items-center" style="background-color: lightgrey">
+      <div>
+        <section>
+          <div class="container-fluid h-custom">
+            <div class="jumbotron custom-jumbotron" style="padding-top: -10px; margin: 0"> <!-- Apply the custom class to the jumbotron -->
+              <div class="row">
+                <div class="col-md-6">
+                  <img src="../static/img2.jpg" class="img-fluid" alt="Sample image" style="width: 500px; height: 500px;">
+                </div>
+                <div class="col-md-6">
+                  <form method="post">
+                    {% csrf_token %}
+                    <h2 style="padding-bottom: 20px">Client Registration</h2>
+
+                    <!-- First Row - Username Field -->
+                    <div class="row">
+                      <div class="col">
+                        <div class="form-outline mb-4">
+                          <label class="form-label" for="form3Example3">Username:</label>
+                          <input type="text" name="username" id="form3Example3" class="form-control" placeholder="Enter your username">
+                        </div>
+                      </div>
+                      <div class="col">
+                        <div class="form-outline mb-4">
+                          <label class="form-label" for="form3Example5">Account Name:</label>
+                          <input type="text" name="acc_name" id="form3Example5" class="form-control" placeholder="Enter your account name">
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Second Row - Password Field -->
+                    <div class="row">
+                      <div class="col">
+                        <div class="form-outline mb-4">
+                          <label class="form-label" for="form3Example4">Password:</label>
+                          <input type="password" name="password" id="form3Example4" class="form-control" placeholder="Enter your password">
+                        </div>
+                      </div>
+                      <div class="col">
+                        <div class="form-outline mb-4">
+                          <label class="form-label" for="form3Example6">Account provider:</label>
+                          <input type="text" name="acc_provider" id="form3Example6" class="form-control" placeholder="Enter your Account dp/provider">
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Third Row - Phone and State Fields -->
+                    <div class="row">
+                      <div class="col">
+                        <div class="form-outline mb-4">
+                          <label class="form-label" for="form3Example7">App Key</label>
+                          <input type="text" name="app_key" id="form3Example7" class="form-control" placeholder="Enter your app key">
+                        </div>
+                      </div>
+                      <div class="col">
+                        <div class="form-outline mb-4">
+                          <label class="form-label" for="form3Example8">Secret key :</label>
+                          <input type="text" name="secret_key" id="form3Example8" class="form-control" placeholder="Enter your secret key">
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Fourth Row - Pincode Field -->
+
+
+                    <div class="text-center text-lg-start mt-4 pt-2">
+                      <button type="submit" name="" class="btn btn-primary btn-lg" value="login" style="padding-left: 2.5rem; padding-right: 2.5rem;">Register</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>

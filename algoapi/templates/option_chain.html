@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% load custom_filters %}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Option Chain</title>
+  <!-- jQuery and Bootstrap JS (Required for modal to work) -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <style>
+    .ltp, .margin { font-weight: bold; }
+    .loading-overlay {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1050;
+      display: none;
+    }
+    table {
+      table-layout: auto !important;
+    }
+    td select {
+      width: 100%;
+      min-width: 100px;
+    }
+    .table thead th {
+      position: sticky;
+      top: 0;
+      background-color: #343a40; /* Match your thead-dark */
+      color: white;
+      z-index: 2;
+    }
+    
+  </style>
+</head>
+<body>
+  <div id="batchProgressModal" class="modal" tabindex="-1" role="dialog" style="display:none;">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content text-center p-4">
+      <h5 class="modal-title">⏳ Batch in Progress</h5>
+      <div id="progressText" class="my-3">Starting...</div>
+      <div id="checkmark" style="display: none; font-size: 3rem; color: green;">✅</div>
+    </div>
+  </div>
+</div>
+
+<style>
+.modal {
+  position: fixed;
+  z-index: 1050;
+  left: 0;
+  top: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0,0,0,0.5);
+}
+.modal-dialog {
+  margin: auto;
+}
+</style>
+  
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+        <a class="navbar-brand" href="/">ALGOTRADING</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ml-auto">
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'open_positions' %}">Open Positions</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'portfolio' %}">Portfolio</a>
+            </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="{% url 'expiry' %}">Add Expiry</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/stockexpiry/">Add StockExpiry</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="/stocks/">AddStock</a>
+              </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="{% url 'full_table' %}">OptionChain</a>
+                </li>
+                <li class="nav-item">
+                          <a class="nav-link" href="{% url 'analysis' %}">Analyse</a>
+                      </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="{% url 'logout' %}">Logout</a>
+              </li>
+                
+                <!-- You can add more links as needed -->
+            </ul>
+        </div>
+    </div>
+</nav>
+  <div id="loadingSpinner" class="loading-overlay">
+    <div class="spinner-border text-primary" role="status">
+      <span class="sr-only">Loading...</span>
+    </div>
+  </div>
+  {% if ltp_missing %}
+<div class="alert alert-warning alert-dismissible fade show" role="alert" id="ltpAlert">
+  <strong>Note:</strong> The following stock codes had no valid LTP: <br>
+  {{ ltp_missing|join:", " }}
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+  <span aria-hidden="true">&times;</span>
+</button>
+</div>
+{% endif %}
+  <div class="container-fluid mt-5">
+    <form id="batchForm" method="POST"">
+        {% csrf_token %}
+        <label for="batchDate">Select Batch Date:</label>
+        <select name="batch_date" id="batchDate" required>
+          {% for date in valid_expiries %}
+            <option value="{{ date }}">{{ date }}</option>
+          {% endfor %}
+          </select>
+        <button type="submit" class="btn btn-primary">🚀 Run Static Excel Call</button>
+      </form>
+    <!-- <form id="batchForm" method="POST">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">🚀 Run Static Excel Put</button>
+      </form> -->
+    <form method="post" action="{% url 'calculate_yield' %}" class="p-4 shadow rounded bg-light">
+      {% csrf_token %}
+
+      <input type="hidden" name="total_items" value="{{ option_data_grouped|length }}">
+      <div class="form-row align-items-end mb-3">
+        <div class="col-md-3">
+          <label for="stockSearch">Search Stock Code:</label>
+          <input type="text" id="stockSearch" class="form-control" placeholder="e.g. INFY">
+        </div>
+        <div class="col-md-3">
+          <label for="yieldFilter">Minimum Yield:</label>
+          <input type="number" id="yieldFilter" class="form-control" placeholder="e.g. 2.5" step="0.01">
+        </div>
+        <div class="col-md-3 d-flex">
+          <button class="btn btn-outline-secondary mr-2" type="button" id="applyYieldFilter">Filter</button>
+          <button class="btn btn-outline-dark" type="button" id="resetYieldFilter">Reset</button>
+        </div>
+      </div>
+      <!-- Calculate Button and Spinner (Top Right) -->
+       
+      <div class="mb-3 d-flex justify-content-end align-items-center flex-wrap gap-2">
+        <button type="button" class="btn btn-secondary me-2" id="selectAllBtn">
+    Select All
+  </button>
+  <button type="submit" name="action" value="place_orders" class="btn btn-primary me-2" id="placeOrdersSubmitBtn">
+  Refresh Selected Option Chain
+  </button>
+
+  
+
+  <!-- <button type="button" class="btn btn-primary me-2" id="calculateBtn">
+    Calculate Yield
+  </button> -->
+
+  <a href="{% url 'export_option_chain_excel' %}" class="btn btn-outline-info">
+    📥 Export to Excel
+  </a>
+</div>
+
+
+      <!-- Table -->
+      <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+        <table id="option-table" class="table table-bordered table-hover w-100">
+          <thead class="thead-dark">
+            <tr>
+              <th>Select</th>
+              <th>Stock Code</th>
+              <th>Lot size</th>
+              <th>Expiry Date</th>
+              <th>Strike Price</th>
+              <th>Right</th>
+              <th>CMP</th>
+              <th>LTP</th>
+              <th>Margin</th>
+              <th>Yield</th>
+              <th>No of lots</th>
+              <th>Buy</th>
+              <th>Sell</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for stock_code, data in option_data_grouped%}
+            <tr class="option-row" 
+              data-stock="{{ stock_code }}" 
+              data-base-stock="{{ stock_code|split_by:'_'|first }}" 
+              data-right="{{ stock_code|split_by:'_'|last }}">
+              <td class="text-center">
+                <input type="checkbox" class="stock-checkbox" name="selected_{{ forloop.counter }}">
+              </td>
+              <td>
+              <input type="text" class="form-control stock-code-dropdown" 
+                        name="stock_code_{{ forloop.counter }}" 
+                        data-current-stock="{{ stock_code|split_by:"_"|first }}" 
+                        value="{{ stock_code|split_by:"_"|first }}"
+                        data-toggle="tooltip"
+                        title="{{ data.stock_name }}" readonly />
+              </td>
+              
+              <input type="hidden" name="lot_size_{{ forloop.counter }}" value="{{ data.lot_size }}">
+              
+              <input type="hidden" name="right_{{ forloop.counter }}" value="{{ stock_code|split_by:"_"|last }}">
+              <td class="lot_size">{{ data.lot_size }}</td>
+
+              <td>
+                <select name="expiry_date_{{ forloop.counter }}" class="expiry-dropdown form-control" data-stock="{{ stock_code }}">
+                  {% for expiry in data.unique_expiry_dates %}
+                  <option value="{{ expiry }}">{{ expiry }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+
+              <td>
+                
+              <select name="strike_price_{{ forloop.counter }}" class="strike-dropdown form-control" data-stock="{{ stock_code }}">
+                {% for row in data.stock_rows|dictsort:"strike_price" %}
+                      <option value="{{ row.strike_price }}"
+                              data-expiry="{{ row.expiry_date }}"
+                              data-ltp="{{ row.ltp }}"
+                              data-margin="{{ row.margin }}"
+                              data-yield="{{ row.yield }}"
+                    {% if row.strike_price|floatformat:"0" == data.start_of_strike|floatformat:"0" %}selected {% endif %}>
+                        {{ row.strike_price }}
+                      </option>
+                {% endfor %}
+              </select>
+            </td>
+              </td>
+              <td class="right">{{ stock_code|split_by:"_"|last }}</td>
+
+              <td class="stock-cmp">{{ data.cmp }}</td>
+              <td class="ltp-value">-</td>
+              <td class="margin-value">-</td>
+              <td class="yield-value">-</td>
+
+              <td>
+                <input type="number" name="lots_{{ forloop.counter }}" class="form-control" value="1" min="1" style="width: 100px; font-size: 1rem;">
+              </td>
+              <!-- Buy/Sell Buttons -->
+              <td>
+                <button type="button" class="btn action-btn btn-secondary" data-action="buy" data-index="{{ forloop.counter }}">Buy</button>
+              </td>
+              <td>
+                <button type="button" class="btn action-btn btn-danger" data-action="sell" data-index="{{ forloop.counter }}">Sell</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <!-- Place Order Button -->
+      <button type="button" id="placeOrdersBtn" class="btn btn-primary" style="margin: 5px;">Place Orders</button>
+    </form>
+  </div>
+  <div class="modal fade" id="buySellModal" tabindex="-1" role="dialog" aria-labelledby="buySellModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <form id="buySellForm">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="buySellModalLabel">Place Order</h5>
+            <button type="button" class="close" data-dismiss="modal">&times;</button>
+          </div>
+          <div class="modal-body">
+            <!-- Display selected stock code, strike price, and LTP -->
+            <div class="form-group">
+              <label for="stockCode">Stock Code</label>
+              <input type="text" id="stockCode" class="form-control" readonly>
+            </div>
+
+            <div class="form-group">
+              <label for="ltp">LTP</label>
+              <input type="text" id="ltp" class="form-control" readonly>
+            </div>
+
+            <div class="form-group">
+              <label for="strikePrice">Strike Price</label>
+              <input type="text" id="strikePrice" class="form-control" readonly>
+            </div>
+
+            <div class="form-group">
+              <label for="numberOfLots">Number of Lots</label>
+              <input type="number" id="numberOfLots" class="form-control" value="1" min="1" required>
+            </div>
+
+            <!-- Action (Buy/Sell) and Order Type -->
+            <div class="form-group">
+              <label for="action">Action</label>
+              <select id="action" class="form-control" required>
+                <option value="buy">Buy</option>
+                <option value="sell">Sell</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="order_type">Order Type</label>
+              <select id="order_type" class="form-control" required>
+                <option value="limit">Limit</option>
+                <option value="market">Market</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="order_price">Price</label>
+              <input type="number" id="order_price" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+              <label for="validity">Validity</label>
+              <select id="validity" class="form-control" required>
+                <option value="day">Day</option>
+                <option value="ioc">IOC</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-warning">Submit Order</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script>
+    function handleSessionFailure() {
+      const container = document.createElement("div");
+      container.style.position = "fixed";
+      container.style.top = "20px";
+      container.style.left = "50%";
+      container.style.transform = "translateX(-50%)";
+      container.style.zIndex = "2000";
+      container.className = "alert alert-danger text-center";
+      container.innerHTML = `
+        Session token is invalid or missing. 
+        <a href="{% url 'client_login' %}" class="alert-link">Click here to login</a>.
+      `;
+      document.body.appendChild(container);
+    }
+    const optionChainData = {{ option_data_grouped_json|safe }};
+    document.addEventListener("DOMContentLoaded", function () {
+      // On change of strike or expiry, update LTP and Margin
+      document.querySelectorAll(".strike-dropdown, .expiry-dropdown").forEach(dropdown => {
+        dropdown.addEventListener("change", function () {
+          const row = this.closest("tr");
+          const stockCode = row.getAttribute("data-stock");
+
+          const strikeDropdown = row.querySelector(".strike-dropdown");
+          const expiryDropdown = row.querySelector(".expiry-dropdown");
+
+          const selectedStrike = strikeDropdown.value;
+          const selectedExpiry = expiryDropdown.value;
+
+          const option = strikeDropdown.querySelector(
+            `option[value="${selectedStrike}"][data-expiry="${selectedExpiry}"]`
+          );
+
+          if (option) {
+            row.querySelector(".ltp-value").textContent = option.dataset.ltp;
+            row.querySelector(".margin-value").textContent = option.dataset.margin;
+            row.querySelector(".yield-value").textContent = option.dataset.yield || '-';
+          } else {
+            row.querySelector(".ltp-value").textContent = "-";
+            row.querySelector(".margin-value").textContent = "-";
+            row.querySelector(".yield-value").textContent = "-";
+          }
+        });
+      });
+
+      // Trigger initial population
+      document.querySelectorAll(".strike-dropdown").forEach(drop => drop.dispatchEvent(new Event("change")));
+
+      const calculateBtn = document.getElementById("calculateBtn");
+      const spinner = document.getElementById("loadingSpinner");
+
+      calculateBtn.addEventListener("click", function () {
+        const rows = document.querySelectorAll("tr.option-row");
+        const form = document.querySelector("form");
+        const anyChecked = Array.from(rows).some(row => row.querySelector(".stock-checkbox").checked);
+
+        if (!anyChecked) {
+          alert("Please select at least one stock before calculating yield.");
+          return;
+        }
+
+        // Remove old hidden inputs
+        form.querySelectorAll("input[name^='ltp_'], input[name^='margin_']").forEach(input => input.remove());
+
+        rows.forEach((row, index) => {
+          const checkbox = row.querySelector(".stock-checkbox");
+          if (!checkbox.checked) return;
+
+          const idx = index + 1;
+          const ltp = row.querySelector(".ltp-value").textContent.trim();
+          const margin = row.querySelector(".margin-value").textContent.trim();
+
+          const ltpInput = document.createElement("input");
+          ltpInput.type = "hidden";
+          ltpInput.name = `ltp_${idx}`;
+          ltpInput.value = ltp;
+
+          const marginInput = document.createElement("input");
+          marginInput.type = "hidden";
+          marginInput.name = `margin_${idx}`;
+          marginInput.value = margin;
+
+          form.appendChild(ltpInput);
+          form.appendChild(marginInput);
+        });
+
+        spinner.style.display = "block";
+        calculateBtn.style.display = "none";
+        document.getElementById("selectAllBtn").style.display = "none";
+
+        const formData = new FormData(form);
+
+        fetch("{% url 'calculate_yield' %}", {
+          method: "POST",
+          body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === "session_invalid") {
+            handleSessionFailure();
+            return;
+          }
+          if (data.status === "success") {
+            console.log("data", data)
+            data.data.forEach(stockData => {
+              console.log(stockData)
+              const rows = document.querySelectorAll(`tr[data-base-stock="${stockData.stock_code}"]`);
+                rows.forEach(row => {
+                  const right = row.getAttribute('data-right');
+                  if (right && right.toLowerCase() === stockData.right.toLowerCase()) {
+                    const yieldCell = row.querySelector(".yield-value");
+                    yieldCell.textContent = parseFloat(stockData.yield_value).toFixed(2);
+
+                    if (stockData.ltp !== undefined) {
+                      row.querySelector(".ltp-value").textContent = stockData.ltp;
+                    }
+
+                    if (stockData.margin !== undefined) {
+                      row.querySelector(".margin-value").textContent = stockData.margin;
+                    }
+
+                    if (stockData.cmp !== undefined) {
+                      const cmpCell = row.querySelector(".stock-cmp");
+                      if (cmpCell) cmpCell.textContent = stockData.cmp;
+                    }
+                  }
+                });
+            });
+          } else {
+            alert("Error in yield calculation.");
+          }
+
+          // Reset checkboxes and toggle button text
+          document.querySelectorAll(".stock-checkbox").forEach(checkbox => {
+            checkbox.checked = false;
+          });
+          allSelected = false;
+          document.getElementById("selectAllBtn").textContent = "Select All";
+          spinner.style.display = "none";
+          calculateBtn.style.display = "inline-block";
+          document.getElementById("selectAllBtn").style.display = "inline-block";
+        })
+        .catch(err => {
+          console.error("AJAX Error:", err);
+          spinner.style.display = "none";
+          calculateBtn.style.display = "inline-block";
+          document.getElementById("selectAllBtn").style.display = "inline-block";
+        });
+      });
+    });
+    document.querySelectorAll(".stock-code-dropdown").forEach(dropdown => {
+      dropdown.addEventListener("change", function () {
+        const selectedStock = this.value;
+        const row = this.closest("tr");
+        const expiryDropdown = row.querySelector(".expiry-dropdown");
+        const strikeDropdown = row.querySelector(".strike-dropdown");
+        const cmpCell = row.querySelector(".stock-cmp");
+        const ltpCell = row.querySelector(".ltp-value");
+        const marginCell = row.querySelector(".margin-value");
+        const stockNameCell = row.querySelector(".stock-name");
+        const lotSizeCell = row.querySelector(".lot_size");
+    
+        // Clear old options
+        expiryDropdown.innerHTML = "";
+        strikeDropdown.innerHTML = "";
+    
+        const stockData = optionChainData[selectedStock];
+        if (!stockData) return;
+    
+        // Populate expiry dropdown
+        stockData.unique_expiry_dates.forEach(expiry => {
+          const option = document.createElement("option");
+          option.value = expiry;
+          option.textContent = expiry;
+          expiryDropdown.appendChild(option);
+        });
+    
+        // Populate strike dropdown
+        stockData.stock_rows.forEach(rowData => {
+          const option = document.createElement("option");
+          option.value = rowData.strike_price;
+          option.textContent = rowData.strike_price;
+          option.setAttribute("data-expiry", rowData.expiry_date);
+          option.setAttribute("data-ltp", rowData.ltp);
+          option.setAttribute("data-margin", rowData.margin);
+          strikeDropdown.appendChild(option);
+        });
+    
+        // Update Stock Name, Lot Size, CMP
+        stockNameCell.textContent = stockData.stock_name;
+        lotSizeCell.textContent = stockData.lot_size;
+        cmpCell.textContent = stockData.cmp;
+    
+        // Reset LTP & Margin
+        ltpCell.textContent = "-";
+        marginCell.textContent = "-";
+    
+        // Trigger change on strike dropdown to populate based on default
+        strikeDropdown.dispatchEvent(new Event("change"));
+      });
+    });
+    document.getElementById("applyYieldFilter").addEventListener("click", function () {
+      const minYield = parseFloat(document.getElementById("yieldFilter").value);
+      const rows = document.querySelectorAll("tr.option-row");
+    
+      rows.forEach(row => {
+        const yieldCell = row.querySelector(".yield-value");
+        const yieldValue = parseFloat(yieldCell.textContent.trim());
+        if (!isNaN(minYield) && (!yieldValue || yieldValue < minYield)) {
+          row.style.display = "none";
+        } else {
+          row.style.display = "";
+        }
+      });
+    });
+    
+    document.getElementById("applyYieldFilter").addEventListener("click", function () {
+      const minYield = parseFloat(document.getElementById("yieldFilter").value);
+      if (isNaN(minYield)) {
+        alert("Please enter a valid minimum yield value.");
+        return;
+      }
+    
+      document.querySelectorAll("tr.option-row").forEach(row => {
+        const yieldCell = row.querySelector(".yield-value").textContent.trim();
+        const yieldValue = parseFloat(yieldCell);
+    
+        if (!isNaN(yieldValue) && yieldValue >= minYield) {
+          row.style.display = "";
+        } else {
+          row.style.display = "none";
+        }
+      });
+    });
+    
+    document.getElementById("resetYieldFilter").addEventListener("click", function () {
+      document.getElementById("yieldFilter").value = "";
+      document.querySelectorAll("tr.option-row").forEach(row => {
+        row.style.display = "";
+      });
+    });
+  document.getElementById("stockSearch").addEventListener("input", function () {
+    const searchTerm = this.value.toLowerCase();
+    document.querySelectorAll("tr.option-row").forEach(row => {
+      const stockCode = row.querySelector(".stock-code-dropdown").value.toLowerCase();
+      row.style.display = stockCode.includes(searchTerm) ? "" : "none";
+    });
+  });
+  
+  let allSelected = false;
+  document.getElementById("selectAllBtn").addEventListener("click", function () {
+    allSelected = !allSelected;
+    document.querySelectorAll(".stock-checkbox").forEach(checkbox => {
+      checkbox.checked = allSelected;
+    });
+    this.textContent = allSelected ? "Deselect All" : "Select All";
+  });
+  // Buy/Sell Modal and logic
+  document.addEventListener("DOMContentLoaded", function () {
+    // Open modal with selected stock details
+    document.querySelectorAll(".buy-sell-btn").forEach(button => {
+      button.addEventListener("click", function () {
+        const row = this.closest("tr");
+        const stockCode = row.querySelector(".stock-code-dropdown").value;
+        const ltp = row.querySelector(".ltp-value").textContent.trim();
+        const strikePrice = row.querySelector(".strike-dropdown").value;
+
+        // Set values in the modal
+        document.getElementById("stockCode").value = stockCode;
+        document.getElementById("ltp").value = ltp;
+        document.getElementById("strikePrice").value = strikePrice;
+
+        // Show the modal
+        $('#buySellModal').modal('show');
+      });
+    });
+
+    // Submit the form when the "Submit Order" button is clicked
+    document.getElementById("buySellForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      // Get selected data
+      const stockCode = document.getElementById("stockCode").value;
+      const ltp = document.getElementById("ltp").value;
+      const strikePrice = document.getElementById("strikePrice").value;
+      const numberOfLots = document.getElementById("numberOfLots").value;
+      const action = document.getElementById("action").value;
+      const orderType = document.getElementById("order_type").value;
+      const orderPrice = document.getElementById("order_price").value;
+      const validity = document.getElementById("validity").value;
+
+      const orderData = {
+        stock_code: stockCode,
+        ltp: ltp,
+        strike_price: strikePrice,
+        quantity: numberOfLots,
+        action: action,
+        order_type: orderType,
+        order_price: orderPrice,
+        validity: validity
+      };
+
+      // Send the order data to the backend
+      fetch("{% url 'place_bulk_orders' %}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": "{{ csrf_token }}"
+        },
+        body: JSON.stringify(orderData)
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === "ok") {
+            alert("Order placed successfully!");
+          } else {
+            alert("Error placing the order.");
+          }
+          $('#buySellModal').modal('hide'); // Close the modal after submission
+        })
+        .catch(err => {
+          console.error("Order error:", err);
+          alert("Failed to place order.");
+          $('#buySellModal').modal('hide'); // Close the modal on error
+        });
+    });
+  });
+    // Global place order button
+    document.getElementById("placeOrdersBtn").addEventListener("click", function() {
+        const selectedOrders = [];
+
+        // Loop through each row to collect data for checked boxes
+        document.querySelectorAll("tr.option-row").forEach(function(row, index) {
+            const checkbox = row.querySelector(".stock-checkbox");
+            if (checkbox && checkbox.checked) {
+                // Find which action button is currently active for this row
+                let action = null;
+                const buyBtn = row.querySelector(".action-btn[data-action='buy']");
+                const sellBtn = row.querySelector(".action-btn[data-action='sell']");
+                if (buyBtn.classList.contains("btn-success") && !buyBtn.classList.contains("btn-secondary")) {
+                  action = "buy";
+                } else if (sellBtn.classList.contains("btn-danger") && !sellBtn.classList.contains("btn-secondary")) {
+                  action = "sell";
+                }
+                if (!action) {
+                  // If neither is active, default to buy
+                  action = "buy";
+                }
+                const orderData = {
+                    stock_code: row.querySelector(".stock-code-dropdown").value,
+
+                    action: action,
+                    
+                    lot_size: row.querySelector('.lot_size').textContent.trim(),
+                    expiry_date: row.querySelector('.expiry-dropdown').value,
+                    strike_price: row.querySelector('.strike-dropdown').value,
+                    ltp: row.querySelector('.ltp-value').textContent.trim(),
+                    margin: row.querySelector('.margin-value').textContent.trim(),
+                    cmp: row.querySelector('.stock-cmp').textContent.trim(),
+                    yield: row.querySelector('.yield-value').textContent.trim(),
+                    lots: row.querySelector('input[name^="lots"]').value,
+                    right: row.querySelector('.right').textContent.trim()
+                };
+                selectedOrders.push(orderData);
+            }
+        });
+
+        // Check if there are selected orders
+        if (selectedOrders.length === 0) {
+            alert("Please select at least one stock for ordering.");
+            return;
+        }
+
+        // Send the selected orders data to the backend (via fetch)
+        fetch("/place_bulk_orders/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({ orders: selectedOrders })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === "ok") {
+              window.location.href = data.redirect_url;
+            } else {
+                alert("Error placing the orders.");
+            }
+        })
+        .catch(err => {
+            console.error("Error placing orders:", err);
+            alert("Failed to place the orders.");
+        });
+    });
+    
+
+    // Handling the action buttons (buy/sell)
+    document.querySelectorAll('.action-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const action = button.getAttribute('data-action');
+            const index = button.getAttribute('data-index');
+            // Find both buttons for this row
+            const row = button.closest("tr");
+            const buyBtn = row.querySelector(".action-btn[data-action='buy']");
+            const sellBtn = row.querySelector(".action-btn[data-action='sell']");
+            if (action === "buy") {
+                buyBtn.classList.remove("btn-secondary");
+                buyBtn.classList.add("btn-success");
+                sellBtn.classList.remove("btn-danger");
+                sellBtn.classList.remove("btn-secondary");
+                sellBtn.classList.add("btn-secondary");
+            } else {
+                sellBtn.classList.remove("btn-secondary");
+                sellBtn.classList.add("btn-danger");
+                buyBtn.classList.remove("btn-success");
+                buyBtn.classList.remove("btn-secondary");
+                buyBtn.classList.add("btn-secondary");
+            }
+        });
+    });
+    $(function () {
+  $('[data-toggle="tooltip"]').tooltip();
+});
+document.getElementById("batchForm").addEventListener("submit", function(e) {
+  e.preventDefault();
+  const modal = document.getElementById("batchProgressModal");
+  modal.style.display = "block";
+  document.getElementById("progressText").textContent = "Submitting...";
+  const backendBaseUrl = "{{ backend_url|escapejs }}";  
+  const token = "{{ auth_token|escapejs }}";
+  const sessionToken = "{{ session_token|escapejs }}";
+  formData = new FormData(this)
+  formData.append("session_token", sessionToken);
+
+
+  fetch(`${backendBaseUrl}/api/run-batch/call/?session_token=${sessionToken}`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Token ${token}`
+      // Do NOT add "Content-Type" when sending FormData
+    },
+    body:formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === "started") {
+      pollProgress();
+    } else {
+      document.getElementById("progressText").textContent = "Error starting task.";
+    }
+  });
+});
+
+function pollProgress() {
+  const textEl = document.getElementById("progressText");
+  const checkEl = document.getElementById("checkmark");
+  const baseUrl = "{{ backend_url|escapejs }}";  // e.g. "https://api.mybackend.com"
+  const interval = setInterval(() => {
+    fetch(`${baseUrl}/batch_status/`)
+      .then(res => res.json())
+      .then(data => {
+        const batch = data.batch;
+        const total = data.total;
+        const done = data.done;
+
+        if (done) {
+          textEl.textContent = "✅ Batch Complete!";
+          checkEl.style.display = "block";
+          clearInterval(interval);
+          setTimeout(() => document.getElementById("batchProgressModal").style.display = "none", 3000);
+        } else {
+          textEl.textContent = `Batch ${batch} of ${total} running...`;
+        }
+      });
+  }, 5000);
+}
+  const placeOrdersSubmitBtn = document.getElementById('placeOrdersSubmitBtn');
+  const form = placeOrdersSubmitBtn.closest('form');
+
+// Save the original form action
+const originalAction = form.action;
+
+  placeOrdersSubmitBtn.addEventListener('click', function () {
+    form.action = "{% url 'refresh_selected' %}";
+    form.addEventListener('submit', function () {
+  // Reset to original action right after submission
+  setTimeout(() => {
+    form.action = originalAction;
+  }, 500);
+});
+  });
+  
+  document.addEventListener('DOMContentLoaded', function () {
+  const yieldHeader = document.querySelector('th:nth-child(10)');
+  let ascending = true;
+
+  yieldHeader.style.cursor = 'pointer';
+  yieldHeader.innerHTML = '<span>Yield</span><span style="margin-left: 5px;">⇅</span>';  // Add arrow icon
+
+  yieldHeader.addEventListener('click', function () {
+    const table = yieldHeader.closest('table');
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+
+    rows.sort((a, b) => {
+      const aVal = parseFloat(a.querySelector('.yield-value')?.textContent || '0');
+      const bVal = parseFloat(b.querySelector('.yield-value')?.textContent || '0');
+      return ascending ? aVal - bVal : bVal - aVal;
+    });
+
+    rows.forEach(row => tbody.appendChild(row));  // Reattach in sorted order
+    ascending = !ascending;
+  });
+});
+</script>
+  
+</body>
+</html>

@@ -1,0 +1,35 @@
+from django.urls import path
+from api import views, stock, stockexpiry
+
+
+urlpatterns = [
+    path('api/login/', views.login_user, name='login_user'),
+    path('api/register/', views.register_client, name='register_user'),
+    path('api/get-open-positions/', views.get_open_positions, name='open_positions'),
+    path('api/get-pnl-summary/', views.trade_pnl_summary_api, name='pnl_summary'),
+    path('api/get-full-table/', views.get_full_table_data, name='full_table'),
+    path('api/process-selected-stocks/', views.process_selected_stocks_backend, name='process_selected_stocks_backend'),
+    path('api/calculate-yield/', views.calculate_yield_backend, name='calculate_yield_backend'),
+    path('api/run-batch/<str:right>/', views.run_batch_view, name="run_batch"),
+    path("batch_status/", views.batch_status, name="batch_status"),
+    path('api/stocks/', stock.stock_list, name='stock_list'),
+    path('api/stock-delete/<int:pk>/', stock.api_stock_delete, name='stock-delete'),
+    path('api/stocks/create/', stock.create_stock_api, name='stock_create'),
+    path('api/stocks/update/<int:pk>/', stock.update_stock_api, name='stock-update'),
+    path('api/expiry-stocks/', stockexpiry.get_expiry_stock_api, name='stock_list'),
+    path('api/expiry-stocks-add/', stockexpiry.create_expiry_stock_api, name='stock_list-add'),
+    path('api/expiry-stocks-update/<int:pk>/', stockexpiry.update_expiry_stock_api, name='stockexpiry-update'),
+    path('api/expiry-stocks-delete/<int:pk>/', stockexpiry.delete_expiry_stock_api, name='stockexpiry-delete'),
+    path('api/strikes/', views.get_strikes_by_stock_and_right_api, name='get_strikes_by_stock_and_right'),
+    path('api/expiry-stocks-weekly/', stockexpiry.api_add_weekly_expiry, name='api_add_weekly_expiry'),
+    path('api/buy-sell/', views.place_order, name='place_order'),
+    path('api/square_off/', views.square_off_api, name='squareoff'),
+    path('api/update_ltp/', views.update_ltp, name='update_ltp'),
+    path('api/get-stock-codes/', views.get_stock_codes_api, name='get_stock_codes_api'),
+    path('api/get-expiry-dates/', views.get_expiry_dates_api, name='get_expiry_dates_api'),
+    path('api/get-stock-info/', views.get_stock_info_api, name='get_stock_info_api'),
+    path('api/get-analysis-inputs/', views.get_analysis_inputs_api, name='get_analysis_inputs_api'),
+    path('api/analysis-view-api/', views.analysis_view_api, name='analysis_view_api'),
+    path('api/get_option_chain/', views.get_option_chain, name='get_option_chain'),
+    path('api/get-valid-expiries/', views.get_valid_expiries_api, name='get_expiry_dates_api'),
+]

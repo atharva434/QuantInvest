@@ -1,0 +1,222 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Confirm Square Off</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body class="bg-light">
+  <div class="container mt-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h4 class="mb-4">🔐 Confirm Square Off</h4>
+        <form method="post">
+          {% csrf_token %}
+          {% if bulk_orders %}
+            <table class="table table-bordered">
+              <thead class="thead-dark">
+                <tr>
+                  <th>Stock Code</th>
+                  <th>Expiry</th>
+                  <th>Strike</th>
+                  <th>Right</th>
+                  <th>Position</th>
+                  <th>Quantity</th>
+                  <th>Order Price (LTP)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for order in bulk_orders %}
+                <tr>
+                  <td>
+                    {{ order.stock_code }}
+                    <input type="hidden" name="stock_code_{{ forloop.counter }}" value="{{ order.stock_code }}">
+                  </td>
+                  <td>
+                    {{ order.expiry }}
+                    <input type="hidden" name="expiry_{{ forloop.counter }}" value="{{ order.expiry }}">
+                  </td>
+                  <td>
+                    {{ order.strike }}
+                    <input type="hidden" name="strike_{{ forloop.counter }}" value="{{ order.strike }}">
+                  </td>
+                  <td>
+                    {{ order.right }}
+                    <input type="hidden" name="right_{{ forloop.counter }}" value="{{ order.right }}">
+                  </td>
+                  <td>
+                    {{ order.action }}
+                    <input type="hidden" name="action_{{ forloop.counter }}" value="{{ order.action }}">
+                  </td>
+                  <td>
+                    <input type="number" min="1" class="form-control" name="quantity_{{ forloop.counter }}" value="{{ order.quantity }}">
+                    <input type="hidden" name="product_{{ forloop.counter }}" value="{{ order.product }}">
+                  </td>
+                  <td>
+                    <input type="number" step="0.01" class="form-control" name="order_price_{{ forloop.counter }}" value="{{ order.ltp }}">
+                    <input type="hidden" name="product_{{ forloop.counter }}" value="{{ order.product }}">
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <input type="hidden" name="total_bulk_orders" value="{{ bulk_orders|length }}">
+            <button type="button" class="btn btn-danger" id="bulkConfirmBtn">Confirm All Square Offs</button>
+          {% else %}
+           <table class="table table-bordered">
+  <thead class="thead-dark">
+    <tr>
+      <th>Stock Code</th>
+      <th>Expiry</th>
+      <th>Strike</th>
+      <th>Right</th>
+      <th>Position</th>
+      <th>Avg Cost</th>
+      <th>Quantity</th>
+      <th>Order Price (LTP)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        {{ stock_code }}
+        <input type="hidden" name="stock_code" value="{{ stock_code }}">
+      </td>
+      <td>
+        {{ expiry }}
+        <input type="hidden" name="expiry" value="{{ expiry }}">
+      </td>
+      <td>
+        {{ strike }}
+        <input type="hidden" name="strike" value="{{ strike }}">
+      </td>
+      <td>
+        {{ right }}
+        <input type="hidden" name="right" value="{{ right }}">
+      </td>
+      <td>
+        {{ action }}
+        <input type="hidden" name="action" value="{{ action }}">
+      </td>
+      <td>
+        {{ avgcost }}
+      </td>
+      <td>
+        <input type="number" min="1" class="form-control" name="quantity" value="{{ quantity }}">
+        <input type="hidden" name="product" value="{{ product }}">
+      </td>
+      
+      <td>
+        <input type="number" step="0.01" class="form-control" name="order_price" value="{{ ltp }}">
+        <input type="hidden" name="product" value="{{ product }}">
+      </td>
+    </tr>
+  </tbody>
+</table>
+<a href="{% url 'open_positions' %}" class="btn btn-secondary ml-2">Cancel</a>
+<button type="button" class="btn btn-danger" id="singleConfirmBtn">Confirm Square Off</button>
+          {% endif %}
+          
+        </form>
+      </div>
+    </div>
+  </div>
+  <!-- Confirmation Modal -->
+  <div class="modal fade" id="confirmModal" tabindex="-1" role="dialog" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="confirmModalLabel">🛑 Confirm Square Off</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p>Please review your selected orders before proceeding:</p>
+          <div id="confirmationDetails"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Back</button>
+          <button type="button" class="btn btn-danger" id="confirmModalSubmitBtn">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script>
+    let confirmMode = null;
+    document.addEventListener("DOMContentLoaded", function() {
+      const form = document.querySelector("form");
+      const confirmButton = document.getElementById("bulkConfirmBtn");
+      const confirmModal = document.getElementById("confirmModal");
+      const confirmSubmitBtn = document.getElementById("confirmModalSubmitBtn");
+
+      if (confirmButton) {
+        confirmButton.addEventListener("click", function(e) {
+          e.preventDefault();
+          confirmMode = 'bulk';
+          const table = form.querySelector("table");
+          const clonedTable = table.cloneNode(true);
+          // Remove only hidden inputs
+          clonedTable.querySelectorAll("input[type='hidden']").forEach(input => input.remove());
+          // Replace number inputs with span showing value
+          clonedTable.querySelectorAll("input[type='number']").forEach(input => {
+            const td = input.closest('td');
+            const span = document.createElement('span');
+            span.textContent = input.value;
+            td.innerHTML = '';
+            td.appendChild(span);
+          });
+          const modalBody = document.getElementById("confirmationDetails");
+          modalBody.innerHTML = "";
+          modalBody.appendChild(clonedTable);
+          $('#confirmModal').modal('show');
+        });
+      }
+
+      const singleConfirmBtn = document.getElementById("singleConfirmBtn");
+      if (singleConfirmBtn) {
+        singleConfirmBtn.addEventListener("click", function(e) {
+          e.preventDefault();
+          confirmMode = 'single';
+          const table = form.querySelector("table");
+          const clonedTable = table.cloneNode(true);
+          clonedTable.querySelectorAll("input[type='hidden']").forEach(input => input.remove());
+          clonedTable.querySelectorAll("input[type='number']").forEach(input => {
+            const td = input.closest('td');
+            const span = document.createElement('span');
+            span.textContent = input.value;
+            td.innerHTML = '';
+            td.appendChild(span);
+          });
+          const modalBody = document.getElementById("confirmationDetails");
+          modalBody.innerHTML = "";
+          modalBody.appendChild(clonedTable);
+          $('#confirmModal').modal('show');
+        });
+      }
+
+      confirmSubmitBtn.addEventListener("click", function () {
+        if (confirmMode === 'single') {
+          const confirmField = document.createElement('input');
+          confirmField.type = 'hidden';
+          confirmField.name = 'confirm';
+          confirmField.value = 'true';
+          form.appendChild(confirmField);
+        } else if (confirmMode === 'bulk') {
+          const confirmBulkField = document.createElement('input');
+          confirmBulkField.type = 'hidden';
+          confirmBulkField.name = 'confirm_bulk';
+          confirmBulkField.value = 'true';
+          form.appendChild(confirmBulkField);
+        }
+
+        $('#confirmModal').modal('hide');
+        form.submit();
+      });
+    });
+  </script>
+</body>
+</html>

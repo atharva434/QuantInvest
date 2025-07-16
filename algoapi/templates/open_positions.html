@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet"href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"/>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
+    <title>Document</title>
+    <style>
+        body {
+          font-family: Arial, sans-serif;
+          background-color: #f7f7f7;
+        }
+      
+        .container2 {
+          max-width: 100%;
+          margin: auto;
+          background-color: white;
+          padding: 20px;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          border-radius: 8px;
+        }
+      
+        h3 {
+          border-bottom: 2px solid #ccc;
+          padding-bottom: 5px;
+          margin-top: 30px;
+        }
+      
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 10px;
+        }
+      
+        th, td {
+          border: 1px solid #ddd;
+          padding: 10px;
+          text-align: center;
+        }
+      
+        th {
+          background-color: #f2f2f2;
+          font-weight: bold;
+        }
+
+        thead th {
+          position: sticky;
+          top: 0;
+          background-color: #f2f2f2;
+          z-index: 10;
+        }
+      
+        tr:nth-child(even) {
+          background-color: #fafafa;
+        }
+      
+        tr:hover {
+          background-color: #f1f1f1;
+        }
+      
+        td[colspan] {
+          text-align: right;
+          font-weight: bold;
+        }
+      
+      </style>
+      
+      <!-- removed duplicate <body> tag -->
+      <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container">
+              <a class="navbar-brand" href="/">ALGOTRADING</a>
+              <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                  <span class="navbar-toggler-icon"></span>
+              </button>
+              <div class="collapse navbar-collapse" id="navbarNav">
+                  <ul class="navbar-nav ml-auto">
+                    <li class="nav-item active">
+                        <a class="nav-link" href="{% url 'open_positions' %}">Open Positions</a>
+                    </li>
+                    <li class="nav-item">
+                <a class="nav-link" href="{% url 'portfolio' %}">Portfolio</a>
+            </li>
+                      <li class="nav-item">
+                          <a class="nav-link" href="{% url 'expiry' %}">Add Expiry</a>
+                      </li>
+                      <li class="nav-item">
+                          <a class="nav-link" href="/stockexpiry/">Add StockExpiry</a>
+                      </li>
+                      <li class="nav-item">
+                        <a class="nav-link" href="/stocks/">AddStock</a>
+                    </li>
+                      <li class="nav-item">
+                          <a class="nav-link" href="{% url 'full_table' %}">OptionChain</a>
+                      </li>
+                      <li class="nav-item">
+                          <a class="nav-link" href="{% url 'analysis' %}">Analyse</a>
+                      </li>
+                      
+                      <li class="nav-item">
+                        <a class="nav-link" href="{% url 'logout' %}">Logout</a>
+                    </li>
+                      
+                      <!-- You can add more links as needed -->
+                  </ul>
+              </div>
+          </div>
+      </nav>
+      {% if messages %}
+        <div class="container mt-3">
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}   
+      <div class="container2">
+          <form method="post" action="{% url 'square_off_confirm' %}">
+          {% csrf_token %}
+          <input type="text" id="searchInput" placeholder="Search by stock code..." style="width: 100%; padding: 10px; margin-bottom: 20px; font-size: 16px;">
+          <button type="submit"  id="bulkSquareOffBtn" class="btn btn-danger mb-2">⚡ Square Off Selected</button>
+          <div style="max-height: 600px; overflow-y: auto;">
+            <table class="table table-bordered table-hover w-100" border="1" cellpadding="5">
+              <thead>
+              <tr>
+                <th><input type="checkbox" id="select-all"></th>
+                <th>Contract</th>
+                <th>Position</th>
+                <th>Qty</th>
+                <th>Avg. Cost</th>
+                <th>Buy Order Quantity</th>
+                <th>Sell Order Quantity</th>
+                <th>LTP</th>
+                <th>Trigger Price</th>
+                <th>P&amp;L</th>
+                <th>Actions</th>
+              </tr>
+              </thead>
+              {% for group in grouped_data %}
+              <tbody>
+              <tr>
+                <td colspan="11"><h3 style="text-align: left;">{{ group.stock_code }}</h3></td>
+              </tr>
+              {% for row in group.rows|dictsort:"Action"|dictsort:"Strike"|dictsort:"Right"|dictsort:"Expiry" %}
+              <tr>
+                <td>
+                  <input
+                    type="checkbox"
+                    name="selected_rows"
+                    class="selectable-checkbox"
+                    value="{{ row.StockCode }}|{{ row.Expiry }}|{{ row.Strike }}|{{ row.Right }}|{{ row.Action }}|{{ row.Qty }}|{{ row.product_type }}|{{row.LTP}}"
+                  >
+                </td>
+                <td>{{ row.StockCode|default_if_none:"-" }}-{{ row.Expiry|default_if_none:"-" }}-{{ row.Strike|default_if_none:"-" }}-{{ row.Right|default_if_none:"-" }}</td>
+                <td>{{ row.Action|default_if_none:"-" }}</td>
+                <td>{% if row.Qty %}{{ row.Qty }}{% else %}-{% endif %}</td>
+                <td>{% if row.AvgCost %}{{ row.AvgCost }}{% else %}-{% endif %}</td>
+                <td>{% if row.cover_quantity and row.cover_quantity != 0 %}{{ row.cover_quantity }}{% else %}-{% endif %}</td>
+                <td>{% if row.cover_order_executed_quantity %}{{ row.cover_order_executed_quantity }}{% else %}-{% endif %}</td>
+                <td>{% if row.LTP %}{{ row.LTP }}{% else %}-{% endif %}</td>
+                <td>{% if row.stoploss_trigger and row.stoploss_trigger != 0 %}{{ row.stoploss_trigger }}{% else %}-{% endif %}</td>
+                <td style="color:{% if row.PL > 0 %}green{% elif row.PL < 0 %}red{% else %}black{% endif %};">
+                  {{ row.PL }}
+                </td>
+                <td>
+                  <form method="post" action="{% url 'square_off_confirm' %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="stock_code" value="{{ row.StockCode }}">
+                      <input type="hidden" name="expiry" value="{{ row.Expiry }}">
+                      <input type="hidden" name="strike" value="{{ row.Strike }}">
+                      <input type="hidden" name="right" value="{{ row.Right }}">
+                      <input type="hidden" name="action" value="{{ row.Action }}">
+                      <input type="hidden" name="quantity" value="{{ row.Qty }}">
+                      <input type="hidden" name="product" value="{{ row.product_type }}">
+                      <input type="hidden" name="ltp" value="{{ row.LTP }}">
+                      <input type="hidden" name="avgcost" value="{{ row.AvgCost }}">
+                      <button type="submit" class="btn btn-sm btn-warning confirm-btn">Square off</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+              <tr style="font-weight: bold;">
+                <td>{{ group.total.Contract|default_if_none:"-" }}</td>
+                <td colspan="2"></td>
+                <td>{% if group.total.Qty %}{{ group.total.Qty }}{% else %}-{% endif %}</td>
+                <td colspan="5"></td>
+                <td style="color:{% if group.total.PL > 0 %}green{% elif group.total.PL < 0 %}red{% else %}black{% endif %};">
+                  {{ group.total.PL }}
+                </td>
+                <td></td>
+              </tr>
+              </tbody>
+              {% endfor %}
+            </table>
+          </div>
+          </form>
+          </div>
+      </body>
+      
+      <script>
+        document.getElementById('searchInput').addEventListener('input', function() {
+          const filter = this.value.toUpperCase();
+          document.querySelectorAll('.container2 h3').forEach(header => {
+            const table = header.nextElementSibling;
+            if (header.textContent.toUpperCase().includes(filter)) {
+              header.style.display = '';
+              table.style.display = '';
+            } else {
+              header.style.display = 'none';
+              table.style.display = 'none';
+            }
+          });
+        });
+      </script> 
+<script>
+    document.getElementById('select-all').addEventListener('change', function() {
+      const checkboxes = document.querySelectorAll('input[name="selected_rows"]');
+      checkboxes.forEach(cb => cb.checked = this.checked);
+    });
+    function updateBulkButtonState() {
+  const checkboxes = document.querySelectorAll('input[name="selected_rows"]');
+  const bulkBtn = document.getElementById('bulkSquareOffBtn');
+  
+  // Enable button if at least one enabled & checked checkbox is checked
+  const anyChecked = Array.from(checkboxes).some(cb => !cb.disabled && cb.checked);
+
+  bulkBtn.disabled = !anyChecked;
+}
+
+// Run on page load and whenever checkboxes change
+document.addEventListener('DOMContentLoaded', updateBulkButtonState);
+document.querySelectorAll('input[name="selected_rows"]').forEach(cb => {
+  cb.addEventListener('change', updateBulkButtonState);
+});
+function disableConfirmButtons() {
+  document.querySelectorAll('input[name="selected_rows"]').forEach((cb, index) => {
+    const row = cb.closest('tr');
+    const qty = parseFloat(row.querySelector('td:nth-child(4)').textContent) || 0;
+    const coverQty = parseFloat(row.querySelector('td:nth-child(6)').textContent) || 0;
+    const remaining = qty - coverQty;
+
+    const confirmBtn = row.querySelector('.confirm-btn');
+    if (confirmBtn) {
+      confirmBtn.disabled = remaining <= 0;
+      if (remaining <= 0) {
+        confirmBtn.title = "Quantity minus Buy Order Quantity is zero; cannot confirm";
+      }
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  disableConfirmButtons();
+});
+ function updateCheckboxStates() {
+    const checkboxes = document.querySelectorAll('input[name="selected_rows"]');
+    let anyEnabledChecked = false;
+
+    checkboxes.forEach(cb => {
+      const row = cb.closest('tr');
+      const qtyCell = row.querySelector('td:nth-child(4)'); // Qty is 4th td
+      const buyOrderQtyCell = row.querySelector('td:nth-child(6)'); // Buy Order Qty is 6th td
+
+      const qty = parseFloat(qtyCell.textContent) || 0;
+      const buyQty = parseFloat(buyOrderQtyCell.textContent) || 0;
+      const remaining = qty - buyQty;
+
+      if (remaining <= 0) {
+        cb.disabled = true;
+        cb.title = "Quantity minus Buy Order Quantity is zero; cannot select";
+        cb.checked = false;
+      } else {
+        cb.disabled = false;
+      }
+
+      if (!cb.disabled && cb.checked) {
+        anyEnabledChecked = true;
+      }
+    });
+
+    const bulkBtn = document.getElementById('bulkSquareOffBtn');
+    if (bulkBtn) {
+      bulkBtn.disabled = !anyEnabledChecked;
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    updateCheckboxStates();
+
+    document.querySelectorAll('input[name="selected_rows"]').forEach(cb => {
+      cb.addEventListener('change', updateCheckboxStates);
+    });
+
+    // Optional: select-all checkbox handling
+    const selectAll = document.getElementById('select-all');
+    if (selectAll) {
+      selectAll.addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('input[name="selected_rows"]:not(:disabled)');
+        checkboxes.forEach(cb => cb.checked = selectAll.checked);
+        updateCheckboxStates();
+      });
+    }
+  });
+  </script>
+</body>
+</html>

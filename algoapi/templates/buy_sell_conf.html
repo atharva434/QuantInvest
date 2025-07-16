@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Buy/Sell Preview</title>
+  <style>
+    #loadingOverlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.7);
+      z-index: 9999;
+      text-align: center;
+      padding-top: 20%;
+      font-size: 24px;
+      color: #333;
+    }
+    body {
+      margin: 0;
+      padding: 20px;
+      background-color: #f0f0f0;
+      font-family: Arial, sans-serif;
+    }
+
+    .container {
+      background-color: white;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 20px;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 12px 15px;
+      text-align: center;
+      font-size: 14px;
+      transition: background-color 0.2s ease;
+    }
+
+    th {
+      background-color: black;
+      color: white;
+      text-transform: uppercase;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+
+    tr:hover {
+      background-color: #f1f1f1;
+    }
+
+    select, input[type="number"] {
+      padding: 8px;
+      font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      margin: 5px 0;
+    }
+
+    input[type="number"]:focus, select:focus {
+      border-color:rgb(0, 0, 0);
+      outline: none;
+    }
+
+    .submit-btn {
+      padding: 12px 25px;
+      background-color:rgb(0, 0, 0);
+      color: white;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      display: block;
+      margin: 20px auto 0;
+      width: 100%;
+      max-width: 200px;
+    }
+
+    .submit-btn:hover {
+      background-color: #45a049;
+    }
+
+    .quantity-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      max-width: 180px;
+      margin: 0 auto;
+    }
+
+    .quantity-wrapper button {
+      padding: 6px 10px;
+      font-size: 14px;
+      margin: 0 5px;
+      cursor: pointer;
+      border: 1px solid #ccc;
+      background-color: white;
+      border-radius: 5px;
+    }
+    input[type="text"]{
+      width:45px;
+    }
+    .quantity-wrapper input[type="text"] {
+      text-align: center;
+      width: 30px;
+    }
+    .expiry input[type="text"]{
+      width: 80px;
+    }
+    .row-action {
+  height: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.duplicate-hover {
+  display: none;
+  text-align: center;
+  margin-top: -10px;
+}
+
+tr:hover + .row-action .duplicate-hover,
+.row-action:hover .duplicate-hover {
+  display: block;
+}
+
+.duplicate-hover button {
+  font-size: 12px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.duplicate-hover button:hover {
+  background-color: #0056b3;
+}
+    
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <form id="placeOrderForm" method="post">
+    {% csrf_token %}
+    <table>
+      <thead>
+        <tr>
+          <th>Stock Code</th>
+          <th>Expiry Date</th>
+          <th>Strike Price</th>
+          <th>Right</th>
+          <th>Action</th>
+          <th>Quantity</th>
+          <th>Order Type</th>
+          <th>Order Price</th>
+          <th>Best Bid Price</th>
+          <th>Best order price</th>
+        </tr>
+      </thead>
+      
+      {% for row in selected_orders %}
+      <tr>
+        <input type="hidden" name="total_rows" value="{{ selected_orders|length }}">
+        <td>
+          
+          <input type="text" name="stock_code_{{ forloop.counter }}" value="{{ row.stock_code }}">
+        </td>
+        <td class="expiry">
+            <input type="text" name="expiry_date_{{ forloop.counter }}" placeholder="Expiry Date" value="{{ row.expiry_date}}">
+        </td>
+        <td>
+          <select name="strike_price_{{ forloop.counter }}" class="strike-price-dropdown">
+            {% for sp in row.strike_prices %}
+              <option value="{{ sp }}" {% if sp == row.strike_price or sp|stringformat:"s" == row.strike_price|stringformat:"s" %}selected{% endif %}>
+                {{ sp }}
+              </option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <select name="right_{{ forloop.counter }}" style="width: max-content;">
+            <option value="CALL" {% if row.right == "CALL" %}selected{% endif %}>CALL</option>
+            <option value="PUT" {% if row.right == "PUT" %}selected{% endif %}>PUT</option>
+          </select>
+        </td>
+        <td>
+            <select name="action_{{ forloop.counter }}" style="width: max-content;">
+                <option value="buy" {% if row.action == "buy" %}selected{% endif %}>Buy</option>
+                <option value="sell" {% if row.action == "sell" %}selected{% endif %}>Sell</option>
+            </select>
+        </td>
+        <td>
+          <div class="quantity-wrapper">
+            <button type="button" class="decrement-btn" data-lot="{{ row.lot_size }}">−</button>
+            <input type="text" class="quantity-input" data-lot="{{ row.lot_size }}" data-lots="{{ row.lots }}" name="quantity_{{ forloop.counter }}" placeholder="Quantity" value="{{ row.quantity }}">
+            <input type="hidden" name="lot_size_{{ forloop.counter }}" value="{{ row.lot_size }}">
+            <button type="button" class="increment-btn" data-lot="{{ row.lot_size }}">+</button>
+          </div>
+        </td>
+        <td>
+            <select name="order_type_{{ forloop.counter }}">
+                <option value="limit" {% if row.order_type == "limit" %}selected{% endif %}>Limit</option>
+                <option value="market" {% if row.order_type == "market" %}selected{% endif %}>Market</option>
+            </select> 
+        </td>
+        <td>
+            <input type="number" class="order-price" step="any" name="order_price_{{ forloop.counter }}" placeholder="Order Price" value="{{ row.order_price }}">
+        </td>
+    <td><input type="text" name="best_bid_price_{{ forloop.counter }}" class="best-bid" readonly></td>
+
+    <!-- Best Offer Price (readonly input) -->
+    <td><input type="text" name="best_offer_price_{{ forloop.counter }}" class="best-offer" readonly></td>
+      <tr class="row-action">
+        <td colspan="11">
+          <div class="duplicate-hover">
+            <button type="button" class="duplicate-row-btn">+ Duplicate This Row</button>
+            <button type="button" class="remove-row-btn" style="margin-left: 10px;">🗑 Remove</button>
+            <button type="button" class="update-price-btn" style="margin-left: 10px;">🔄 Update LTP</button>
+          </div>
+        </td>
+    </tr>
+    </tr>
+      {% endfor %}
+    </tbody>
+    </table>
+    
+    <div style="display: flex; justify-content: center; gap: 0;">
+      <button type="button" class="submit-btn" onclick="window.history.back();" style="background-color: #6c757d; margin-right: -300px;">Back</button>
+      <button type="button" class="submit-btn" id="showConfirmModalBtn">Submit</button>
+    </div>
+  </form>
+</div>
+<!-- Confirmation Modal for order summary -->
+<div id="confirmModal" class="modal">
+  <div class="modal-content">
+    <h4>Confirm Order Placement</h4>
+    <div id="confirmOrderTableContainer" style="max-height: 300px; overflow-y: auto;">
+      <table class="table table-bordered" id="confirmOrderTable">
+        <thead>
+          <tr>
+            <th>Stock Code</th>
+            <th>Expiry</th>
+            <th>Strike</th>
+            <th>Right</th>
+            <th>Action</th>
+            <th>Qty</th>
+            <th>Type</th>
+            <th>Price</th>
+            <th>Best Bid price</th>
+            <th>Best Offer price</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div style="text-align: right;">
+      <button id="confirmModalCancel" class="btn btn-secondary">Cancel</button>
+      <button id="confirmModalConfirm" class="btn btn-primary">Confirm</button>
+    </div>
+  </div>
+</div>
+<script>
+  // Fill the confirmation table with current order data
+  function fillConfirmTable() {
+    const tableBody = document.querySelector("#confirmOrderTable tbody");
+    tableBody.innerHTML = "";
+    // Only select main rows (not .row-action)
+    const rows = document.querySelectorAll("#placeOrderForm table tr:not(.row-action)");
+    rows.forEach(row => {
+      const cells = row.querySelectorAll("td");
+      if (cells.length > 0) {
+        const data = [
+          cells[0].querySelector("input")?.value || "",
+          cells[1].querySelector("input")?.value || "",
+          cells[2].querySelector("select")?.value || "",
+          cells[3].querySelector("select")?.value || "",
+          cells[4].querySelector("select")?.value || "",
+          cells[5].querySelector("input")?.value || "",
+          cells[6].querySelector("select")?.value || "",
+          cells[7].querySelector("input")?.value || "",
+          cells[8].querySelector("input")?.value || "",
+          cells[9].querySelector("input")?.value || "",
+        ];
+        const rowHtml = `<tr>${data.map(val => `<td>${val}</td>`).join("")}</tr>`;
+        tableBody.insertAdjacentHTML("beforeend", rowHtml);
+      }
+    });
+  }
+
+  // Modal logic for confirmation
+  document.addEventListener("DOMContentLoaded", function() {
+    const submitBtn = document.getElementById("showConfirmModalBtn");
+    const confirmModal = document.getElementById("confirmModal");
+    const confirmModalCancel = document.getElementById("confirmModalCancel");
+    const confirmModalConfirm = document.getElementById("confirmModalConfirm");
+    const placeOrderForm = document.getElementById("placeOrderForm");
+
+    // Show confirmation modal with order summary
+    submitBtn.addEventListener("click", function(e) {
+      e.preventDefault();
+      fillConfirmTable();
+      confirmModal.style.display = "block";
+    });
+
+    // Cancel: close modal
+    confirmModalCancel.addEventListener("click", function() {
+      confirmModal.style.display = "none";
+    });
+
+    // Confirm: submit the form (triggers AJAX logic)
+    confirmModalConfirm.addEventListener("click", function() {
+      confirmModal.style.display = "none";
+      // Programmatically submit form
+      placeOrderForm.requestSubmit();
+    });
+
+    // Hide modal if user clicks outside modal-content
+    window.addEventListener("click", function(event) {
+      if (event.target === confirmModal) {
+        confirmModal.style.display = "none";
+      }
+    });
+  });
+</script>
+
+
+<!-- Modal for order results -->
+<div id="orderModal" class="modal">
+  <div class="modal-content">
+    <h4>Order Results</h4>
+    <pre id="orderResults"></pre>
+  </div>
+  <div class="modal-footer">
+    <button class="modal-close btn">Close</button>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.quantity-input').forEach(input => {
+    if (!input.value) {
+      const lot = parseInt(input.dataset.lot, 10);
+      const lots = parseInt(input.dataset.lots, 10);
+      input.value = lot * lots;
+    }
+  });
+</script>
+<script>
+  document.addEventListener('click', function (e) {
+  if (e.target.classList.contains('increment-btn')) {
+    const lot = parseInt(e.target.dataset.lot, 10);
+    const wrapper = e.target.closest('.quantity-wrapper');
+    const input = wrapper.querySelector('.quantity-input');
+    const current = parseInt(input.value, 10) || 0;
+    input.value = current + lot;
+  }
+
+  if (e.target.classList.contains('decrement-btn')) {
+    const lot = parseInt(e.target.dataset.lot, 10);
+    const wrapper = e.target.closest('.quantity-wrapper');
+    const input = wrapper.querySelector('.quantity-input');
+    const current = parseInt(input.value, 10) || 0;
+    const newVal = current - lot;
+    input.value = newVal > 0 ? newVal : 0;
+  }
+});
+  
+</script>
+
+<script>
+  // Handle form submission via AJAX
+  document.getElementById('placeOrderForm').addEventListener('submit', function(e) {
+    e.preventDefault();  // Prevent default form submission
+
+    document.getElementById("loadingOverlay").style.display = "block";
+    const submitButton = document.getElementById("showConfirmModalBtn");
+    submitButton.disabled = true;
+    submitButton.style.opacity = 0.6;
+
+    let formData = new FormData(this);  // Create FormData object from the form
+
+    // Send form data via AJAX to the server
+    const backendBaseUrl = "{{ backend_url|escapejs }}";  
+    const token = "{{ auth_token|escapejs }}";
+    const sessionToken = "{{ session_token|escapejs }}";
+
+    fetch(`${backendBaseUrl}/api/buy-sell/?session_token=${sessionToken}`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Token ${token}`
+      // Do NOT add "Content-Type" when sending FormData
+    },
+    body: formData
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        // Process results if success
+        const results = data.results;
+        let passedOrders = [];
+        let failedOrders = [];
+
+        results.forEach(result => {
+          if (result.quantities && result.quantities.length > 0) {
+            result.quantities.forEach((qty, idx) => {
+              const orderId = result.order_ids && result.order_ids[idx];
+              if (orderId) {
+                passedOrders.push(`Stock: ${result.stock_code}, Quantity: ${qty}, Order ID: ${orderId}`);
+              } else {
+                failedOrders.push(`Stock: ${result.stock_code}, Quantity: ${qty}, Error: ${result.error || 'Unknown error'}`);
+              }
+            });
+          } else {
+            if (result.status === "failed") {
+              failedOrders.push(`Stock: ${result.stock_code}, Error: ${result.error || 'Unknown error'}`);
+            }
+          }
+        });
+
+        let message = "";
+        if (passedOrders.length > 0) {
+          message += "Passed Orders:\n" + passedOrders.join("\n") + "\n\n";
+        }
+        if (failedOrders.length > 0) {
+          message += "Failed Orders:\n" + failedOrders.join("\n");
+        }
+
+        // Display the result message in the modal
+        document.getElementById("orderResults").textContent = message;
+        document.getElementById("orderModal").style.display = "block";  // Show the modal
+      } else {
+        alert("Something went wrong. Please try again.");
+      }
+      document.getElementById("loadingOverlay").style.display = "none";
+      submitButton.disabled = false;
+      submitButton.style.opacity = 1;
+    })
+    .catch(error => {
+      console.error("Error:", error);
+      alert("Error occurred while submitting the order. Please try again.");
+      document.getElementById("loadingOverlay").style.display = "none";
+      submitButton.disabled = false;
+      submitButton.style.opacity = 1;
+    });
+  });
+
+  // Close the modal when the user clicks the close button
+  document.querySelector(".modal-close").addEventListener("click", function() {
+    document.getElementById("orderModal").style.display = "none";
+  });
+  function attachRemoveButton(button) {
+    button.addEventListener('click', function () {
+      const actionRow = this.closest('.row-action');
+      const prevRow = actionRow.previousElementSibling;
+
+      // Remove both rows
+      prevRow.remove();
+      actionRow.remove();
+
+      // Update total_rows
+      const totalRowsInput = document.querySelector('input[name="total_rows"]');
+      if (totalRowsInput) {
+        let currentVal = parseInt(totalRowsInput.value, 10) || 1;
+        totalRowsInput.value = Math.max(currentVal - 1, 0);
+      }
+    });
+  }
+  function attachDuplicateButton(button) {
+    button.addEventListener('click', function () {
+      const actionRow = this.closest('.row-action');
+      const prevRow = actionRow.previousElementSibling;
+      const clonedRow = prevRow.cloneNode(true);
+      const clonedActionRow = actionRow.cloneNode(true);
+
+      const totalRowsInput = document.querySelector('input[name="total_rows"]');
+      let rowCount = parseInt(totalRowsInput.value, 10) || 1;
+      const newIndex = rowCount + 1;
+
+      clonedRow.querySelectorAll('[name]').forEach(el => {
+      const name = el.getAttribute('name');
+      if (name.includes('_')) {
+        const base = name.substring(0, name.lastIndexOf('_'));
+        el.name = `${base}_${newIndex}`;
+      }
+      
+      // Optional: Clear input values for cloned rows
+    });
+
+      const lotSizeHidden = clonedRow.querySelector('input[type="hidden"][name^="lot_size_"]');
+      if (lotSizeHidden) {
+        lotSizeHidden.setAttribute('name', `lot_size_${newIndex}`);
+      }
+
+      actionRow.parentNode.insertBefore(clonedRow, actionRow.nextSibling);
+      actionRow.parentNode.insertBefore(clonedActionRow, clonedRow.nextSibling);
+
+      // Update total_rows
+      if (totalRowsInput) {
+        totalRowsInput.value = newIndex;
+      }
+
+      const newButton = clonedActionRow.querySelector('.duplicate-row-btn');
+      if (newButton) {
+        attachDuplicateButton(newButton);
+      }
+      const removeButton = clonedActionRow.querySelector('.remove-row-btn');
+      if (removeButton) attachRemoveButton(removeButton);
+      const updateButton = clonedActionRow.querySelector('.update-price-btn');
+      if (updateButton) {
+        attachUpdatePriceButton(updateButton);
+      }
+      const newDropdown = clonedRow.querySelector('.strike-price-dropdown');
+      if (newDropdown) {
+          const originalIndex = Array.from(document.querySelectorAll('.strike-price-dropdown')).indexOf(prevRow.querySelector('.strike-price-dropdown'));
+          attachStrikeDropdownListener(newDropdown, originalIndex);
+      }
+    });
+  }
+
+</script>
+
+<script>
+  // Attach update LTP button logic
+  function attachUpdatePriceButton(button) {
+    button.addEventListener('click', function () {
+      const row = this.closest('.row-action').previousElementSibling;
+      const stockCode = row.querySelector('input[name^="stock_code_"]').value;
+      const expiryDate = row.querySelector('input[name^="expiry_date_"]').value;
+      const strikePrice = row.querySelector('select[name^="strike_price_"]').value;
+      const right = row.querySelector('select[name^="right_"]').value;
+      const backendBaseUrl = "{{ backend_url|escapejs }}";  
+      const token = "{{ auth_token|escapejs }}";
+      const sessionToken = "{{ session_token|escapejs }}";
+
+
+      fetch(`${backendBaseUrl}/api/update_ltp/?session_token=${sessionToken}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+           "Authorization": `Token ${token}`
+        },
+        body: JSON.stringify({
+          stock_code: stockCode,
+          expiry_date: expiryDate,
+          strike_price: strikePrice,
+          right: right
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          const priceInput = row.querySelector('input[name^="order_price_"]');
+          priceInput.value = data.ltp;
+        } else {
+          alert("Failed to fetch LTP.");
+        }
+      })
+      .catch(error => {
+        console.error("Error fetching LTP:", error);
+        alert("Error occurred while fetching LTP.");
+      });
+    });
+  }
+
+  document.querySelectorAll('.duplicate-row-btn').forEach(attachDuplicateButton);
+  document.querySelectorAll('.remove-row-btn').forEach(attachRemoveButton);
+  document.querySelectorAll('.update-price-btn').forEach(attachUpdatePriceButton);
+</script>
+
+<style>
+  .modal {
+    display: none; 
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.4); 
+    padding-top: 60px;
+  }
+
+  .modal-content {
+    background-color: #fff;
+    margin: auto;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 900px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  }
+
+  #orderResults {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: monospace;
+    font-size: 14px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+  }
+
+  .modal-footer {
+    padding: 10px;
+    text-align: right;
+  }
+</style>
+<script>
+const strikeMaps = {{ strike_data_json|safe }};
+
+function attachStrikeDropdownListener(dropdown, mapIndex) {
+    const row = dropdown.closest('tr');
+    const bidInput = row.querySelector('.best-bid');
+    const offerInput = row.querySelector('.best-offer');
+    const orderInput = row.querySelector('.order-price');
+
+    function updatePrices() {
+        const selectedStrike = dropdown.value;
+        const currentMap = strikeMaps[mapIndex];
+
+        if (currentMap && currentMap[selectedStrike]) {
+            bidInput.value = currentMap[selectedStrike]["best_bid_price"];
+            offerInput.value = currentMap[selectedStrike]["best_offer_price"];
+            orderInput.value = currentMap[selectedStrike]["order_price"];
+        } else {
+            bidInput.value = "";
+            offerInput.value = "";
+            orderInput.value = "";
+        }
+    }
+
+    dropdown.addEventListener("change", updatePrices);
+    updatePrices();
+}
+
+function initializeStrikeDropdowns() {
+  document.querySelectorAll('.strike-price-dropdown').forEach((dropdown, index) => {
+    const row = dropdown.closest('tr');
+    const bidInput = row.querySelector('.best-bid');
+    const offerInput = row.querySelector('.best-offer');
+    const orderInput = row.querySelector('.order-price');
+
+    function updatePrices() {
+      const selectedStrike = dropdown.value;
+      const currentMap = strikeMaps[index];
+
+      if (currentMap && currentMap[selectedStrike]) {
+        bidInput.value = currentMap[selectedStrike]["best_bid_price"];
+        offerInput.value = currentMap[selectedStrike]["best_offer_price"];
+        orderInput.value = currentMap[selectedStrike]["order_price"];
+      } else {
+        bidInput.value = "";
+        offerInput.value = "";
+        orderInput.value = "";
+      }
+    }
+
+    dropdown.addEventListener("change", updatePrices);
+    updatePrices();  // initialize on page load
+  });
+}
+initializeStrikeDropdowns();
+
+// Initial call on page load
+document.querySelectorAll('.strike-price-dropdown').forEach((dropdown, index) => {
+    attachStrikeDropdownListener(dropdown, index);
+});
+</script>
+</body>
+<div id="loadingOverlay">Processing Order...</div>
+</html>

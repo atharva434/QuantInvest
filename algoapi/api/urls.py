@@ -1,0 +1,43 @@
+from django.urls import path
+from api import views,stockexpiry, static_loading, user_auth, stock, expiry
+from django.contrib.auth.views import LogoutView 
+# from api import user_auth
+
+urlpatterns = [
+    path('buy_sell_conf',views.buy_sell_conf,name="buy_sell_conf"),
+    path('client_login', user_auth.client_login, name = "client_login"),
+    path("logout",LogoutView.as_view(next_page="client_login"),name="logout"),
+    path('client_registration', user_auth.client_registration, name="client_registration"),
+    path('get_option_chain', views.process_selected_stocks, name="get_option_chain"),
+    path("full_table", views.full_table, name="full_table" ),
+    path("set_session_token", views.set_session_token, name="set_session_token"),
+    path('calculate-yield/', views.calculate_yield, name='calculate_yield'),
+    path('stockexpiry/', stockexpiry.Expiry_Stock_list, name='stockexpiry_list'),
+    path('stockexpiry/add/', stockexpiry.Expiry_Stock_add, name='stockexpiry_add'),
+    path('stockexpiry/update/<int:pk>/', stockexpiry.Expiry_Stock_update, name='stockexpiry_update'),
+    path('stockexpiry/delete/<int:pk>/', stockexpiry.Expiry_Stock_delete, name='stockexpiry_delete'),
+    path('add-weekly-expiry/', stockexpiry.add_weekly_expiry, name='add_weekly_expiry'),
+    # path("session_token_refresh", views.session_token_refresh, name = "session_token_refresh"),
+    path('stocks/', stock.stock_list, name='stock_list'),
+    path('stocks/create/', stock.stock_create, name='stock_create'),
+    path('stocks/<int:pk>/edit/', stock.stock_update, name='stock_update'),
+    path('stocks/<int:pk>/delete/', stock.stock_delete, name='stock_delete'),
+    path('place_order', views.place_order, name = "place_order"),
+    path('place_bulk_orders/', views.place_orders, name='place_bulk_orders'),
+    path('',views.show_open_positions , name="open_positions"),
+    path('refresh_option_chain', views.home, name="refresh_option_chain"),
+    path("portfolio", views.trade_pnl_summary, name="portfolio"),
+    path('analyze/', views.analysis_view, name='analysis'),
+    path("expiry", expiry.expiry_list_view, name = "expiry"),
+    path('expiry/add/', expiry.expiry_add_view, name='expiry_add'),
+    path('expiry/update/<int:id>/', expiry.expiry_update_view, name='expiry_update'),
+    path('expiry/delete/<int:id>/', expiry.expiry_delete_view, name='expiry_delete'),
+    path('square-off/', views.square_off_view, name='square_off'),
+    path('square-off-bulk/', views.square_off_bulk_view, name='square_off_bulk'),
+    path('get-ltp/', views.update_ltp, name='get_ltp'),
+    path('square-off-confirm/', views.square_off_confirm, name='square_off_confirm'),
+    # path('run_batch/<str:right>/', views.run_batch_view, name='run_batch'),
+    # path('batch_status/', views.batch_status, name='batch_status'),
+    path("export_option_chain_excel/", views.export_option_chain_excel, name="export_option_chain_excel"),
+    path('refresh_selected', views.process_selected_stocks, name='refresh_selected'),
+]

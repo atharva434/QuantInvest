@@ -1,0 +1,555 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Stock Analysis Dashboard</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
+  <link rel="stylesheet" href="{% static 'css/analysis_styles.css' %}" />
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+      <a class="navbar-brand" href="/">ALGOTRADING</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ml-auto">
+          <li class="nav-item"><a class="nav-link" href="{% url 'open_positions' %}">Open Positions</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'portfolio' %}">Portfolio</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'expiry' %}">Add Expiry</a></li>
+          <li class="nav-item"><a class="nav-link" href="/stockexpiry/">Add StockExpiry</a></li>
+          <li class="nav-item"><a class="nav-link" href="/stocks/">AddStock</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'full_table' %}">OptionChain</a></li>
+          <li class="nav-item active"><a class="nav-link" href="{% url 'analysis' %}">Analyse</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid mt-4 px-4">
+    <form method="post" id="stock-analysis-form">
+      <div class="table-responsive">
+      {% csrf_token %}
+      <table class="table table-bordered text-center">
+        <tbody>
+          <tr>
+            <th>Stock Code</th>
+            <td>
+              <select id="stock-code" name="stock_code" class="form-control">
+                <option value="" disabled {% if not selected_stock_code %}selected{% endif %}>-- Select --</option>
+                {% for code in stock_codes %}
+                  <option value="{{ code }}" {% if code == selected_stock_code %}selected{% endif %}>{{ code }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <th>Expiry Date</th>
+            <td>
+              <select id="expiry-date" name="expiry_date" class="form-control">
+                <option value="">-- Select --</option>
+                {% for date in expiry_dates %}
+                  <option value="{{ date.raw }}" {% if date.raw == selected_expiry_date %}selected{% endif %}>
+                    {{ date.display }}
+                  </option>
+                {% endfor %}
+              </select>
+            </td>
+            <th>CMP</th>
+            <td>
+              <span id="cmp">{{ cmp|default:"-" }}</span>
+              <input type="hidden" id="cmp-input" name="cmp" value="{{ cmp }}">
+            </td>
+            <th>ATM Strike</th>
+            <td>
+              <span id="atm-plus-10">{{ atm_strike|default:"-" }}</span>
+              <input type="hidden" id="atm-strike-input" name="atm_strike" value="{{ atm_strike }}">
+            </td>
+          </tr>
+          <tr>
+            <th>Today Date</th>
+            <td><span id="start-date-display">{{ today_date }}</span></td>
+            <th>Days to Expiry</th>
+            <td>
+              <span id="days-to-expiry">{{ days_to_expiry|default:"-" }}</span>
+              <input type="hidden" id="days-to-expiry-input" name="days_to_expiry" value="{{ days_to_expiry }}">
+            </td>
+            <th>Start Date</th>
+            <td>
+              <input type="date" name="start_date" id="start-date" class="form-control"
+                     value="{{ start_date }}" min="{{ min_date }}" max="{{ max_date }}">
+            </td>
+            <th>End Date</th>
+            <td>
+              <input type="date" name="end_date" id="end-date" class="form-control"
+                     value="{{ end_date }}" min="{{ min_date }}" max="{{ max_date }}">
+            </td>
+          </tr>
+          <tr>
+            <td colspan="8" class="text-right">
+              <button type="submit" class="btn btn-primary">Analyze</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </form>
+    <div id="loader" style="display: none; text-align: center; margin: 1rem;">
+      <div class="spinner-border text-primary" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+      <div>Fetching CMP and strike prices...</div>
+    </div>
+  </div>
+
+  <div class="container-fluid mt-4 px-4">
+  <h5 class="mb-3">{{ movement_range_label }}</h5>
+  <div class="table-responsive">
+  <table class="table table-bordered text-center">
+    <thead class="thead-light">
+      <tr>
+        <th rowspan="2">% Movement Range</th>
+        <th colspan="2">Days to Expiry Move</th>
+        <th colspan="2">Monthly Expiry Move</th>
+      </tr>
+      <tr>
+        <th>Months Crossed</th>
+        <th>Worst Price</th>
+        <th>Months Crossed</th>
+        <th>Worst Price</th>
+      </tr>
+    </thead>
+    <tbody>
+        <!-- Positive Moves -->
+        <tr class="table-success font-weight-bold">
+          <td class="text-center">Positive Moves</td>
+          <td colspan="4"></td>
+        </tr>
+        <tr>
+          <td>Less than +5%</td>
+          <td>{{ pos_0_5_days_to_expiry }}</td>
+          <td>{{ pos_0_5_days_to_expiry_strike }}</td>
+          <td>{{ pos_0_5_monthly_expiry }}</td>
+          <td>{{ pos_0_5_monthly_expiry_strike }}</td>
+        </tr>
+        <tr>
+          <td>+5% to +10%</td>
+          <td>{{ pos_5_10_days_to_expiry }}</td>
+          <td>{{ pos_5_10_days_to_expiry_strike }}</td>
+          <td>{{ pos_5_10_monthly_expiry }}</td>
+          <td>{{ pos_5_10_monthly_expiry_strike }}</td>
+        </tr>
+        <tr>
+          <td>+10% to +15%</td>
+          <td>{{ pos_10_15_days_to_expiry }}</td>
+          <td>{{ pos_10_15_days_to_expiry_strike }}</td>
+          <td>{{ pos_10_15_monthly_expiry }}</td>
+          <td>{{ pos_10_15_monthly_expiry_strike }}</td>
+        </tr>
+        <tr>
+          <td>+15% to +20%</td>
+          <td>{{ pos_15_20_days_to_expiry }}</td>
+          <td>{{ pos_15_20_days_to_expiry_strike }}</td>
+          <td>{{ pos_15_20_monthly_expiry }}</td>
+          <td>{{ pos_15_20_monthly_expiry_strike }}</td>
+        </tr>
+        <tr>
+          <td>+20% to +25%</td>
+          <td>{{ pos_20_25_days_to_expiry }}</td>
+          <td>{{ pos_20_25_days_to_expiry_strike }}</td>
+          <td>{{ pos_20_25_monthly_expiry }}</td>
+          <td>{{ pos_20_25_monthly_expiry_strike }}</td>
+        </tr>
+        <tr>
+          <td>More than +25%</td>
+          <td>{{ pos_25_days_to_expiry }}</td>
+          <td>{{ pos_25_days_to_expiry_strike }}</td>
+          <td>{{ pos_25_monthly_expiry }}</td>
+          <td>{{ pos_25_monthly_expiry_strike }}</td>
+        </tr>
+
+      <!-- Negative Moves -->
+      <!-- Negative Moves -->
+        <tr class="table-danger font-weight-bold">
+          <td class="text-center">Negative Moves</td>
+          <td colspan="4"></td>
+        </tr>
+        <tr>
+          <td>Less than -5%</td>
+          <td>{{ neg_0_5_days_to_expiry }}</td>
+          <td>{{ neg_0_5_days_to_expiry_strike }}</td>
+          <td>{{ neg_0_5_monthly_expiry }}</td>
+          <td>{{ neg_0_5_monthly_expiry_strike }}</td>
+        </tr>
+        <tr>
+          <td>-5% to -10%</td>
+          <td>{{ neg_5_10_days_to_expiry }}</td>
+          <td>{{ neg_5_10_days_to_expiry_strike }}</td>
+          <td>{{ neg_5_10_monthly_expiry }}</td>
+          <td>{{ neg_5_10_monthly_expiry_strike }}</td>
+        </tr>
+        <tr>
+          <td>-10% to -15%</td>
+          <td>{{ neg_10_15_days_to_expiry }}</td>
+          <td>{{ neg_10_15_days_to_expiry_strike }}</td>
+          <td>{{ neg_10_15_monthly_expiry }}</td>
+          <td>{{ neg_10_15_monthly_expiry_strike }}</td>
+        </tr>
+        <tr>
+          <td>-15% to -20%</td>
+          <td>{{ neg_15_20_days_to_expiry }}</td>
+          <td>{{ neg_15_20_days_to_expiry_strike }}</td>
+          <td>{{ neg_15_20_monthly_expiry }}</td>
+          <td>{{ neg_15_20_monthly_expiry_strike }}</td>
+        </tr>
+        <tr>
+          <td>-20% to -25%</td>
+          <td>{{ neg_20_25_days_to_expiry }}</td>
+          <td>{{ neg_20_25_days_to_expiry_strike }}</td>
+          <td>{{ neg_20_25_monthly_expiry }}</td>
+          <td>{{ neg_20_25_monthly_expiry_strike }}</td>
+        </tr>
+        <tr>
+          <td>More than -25%</td>
+          <td>{{ neg_25_days_to_expiry }}</td>
+          <td>{{ neg_25_days_to_expiry_strike }}</td>
+          <td>{{ neg_25_monthly_expiry }}</td>
+          <td>{{ neg_25_monthly_expiry_strike }}</td>
+        </tr>
+      </tbody>
+  </table>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  console.log("[INIT] DOM fully loaded");
+
+  const form = document.getElementById('stock-analysis-form');
+  const stockSelect = document.getElementById('stock-code');
+  const expirySelect = document.getElementById('expiry-date');
+  const startInput = document.getElementById('start-date');
+  const endInput = document.getElementById('end-date');
+  const loader = document.getElementById('loader');
+
+  const backendBaseUrl = "{{ backend_url|escapejs }}";  
+  const authToken = "{{ auth_token|escapejs }}";
+  const sessionToken = "{{ session_token|escapejs }}";
+
+  let stockDataCache = {};
+  let suppressExpiryChangeOnce = true;
+
+  async function populateStockCodes() {
+    console.log("[populateStockCodes] Fetching stock codes...");
+    try {
+      const res = await fetch(`${backendBaseUrl}/api/get-stock-codes/`, {
+        headers: { Authorization: `Token ${authToken}` }
+      });
+      const data = await res.json();
+      stockSelect.innerHTML = '<option value="">-- Select Stock Code --</option>';
+      data.stock_codes.sort().forEach(code => {
+        const opt = document.createElement('option');
+        opt.value = code;
+        opt.textContent = code;
+        stockSelect.appendChild(opt);
+      });
+      console.log("[populateStockCodes] Stock codes loaded");
+    } catch (err) {
+      console.error("❌ Failed to fetch stock codes", err);
+    }
+  }
+
+  async function restoreLastSessionState() {
+    const stockCode = sessionStorage.getItem('stock_code');
+    const expiryDate = sessionStorage.getItem('expiry_date');
+    const startDate = sessionStorage.getItem('start_date');
+    const endDate = sessionStorage.getItem('end_date');
+    if (!stockCode || !expiryDate) return;
+
+    console.log("[restoreLastSessionState] Restoring for stock:", stockCode, "expiry:", expiryDate);
+    stockSelect.value = stockCode;
+    loader.style.display = 'block';
+
+    try {
+      const expiryRes = await fetch(`${backendBaseUrl}/api/get-expiry-dates/?stock_code=${stockCode}`, {
+        headers: { Authorization: `Token ${authToken}` }
+      });
+      const expiryData = await expiryRes.json();
+      expirySelect.innerHTML = '<option value="">-- Select Expiry Date --</option>';
+      expiryData.expiry_dates.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item.raw;
+        opt.textContent = item.display;
+        expirySelect.appendChild(opt);
+      });
+
+      console.log("[restoreLastSessionState] Setting expirySelect.value and suppressing event...");
+      expirySelect.value = expiryDate;
+
+      console.log("[restoreLastSessionState] Fetching analysis inputs...");
+      const analysisRes = await fetch(`${backendBaseUrl}/api/get-analysis-inputs/?stock_code=${stockCode}&expiry_date=${expiryDate}&session_token=${sessionToken}`, {
+        headers: { Authorization: `Token ${authToken}` }
+      });
+      const data = await analysisRes.json();
+      console.log("[restoreLastSessionState] Analysis inputs received");
+
+      stockDataCache[stockCode] = {
+        cmp: data.cmp,
+        atm_strike: data.atm_strike,
+        min_date: data.min_date,
+        max_date: data.max_date,
+        start_date_display: data.start_date,
+      };
+
+      document.getElementById('cmp').textContent = data.cmp;
+      document.getElementById('atm-plus-10').textContent = data.atm_strike;
+      document.getElementById('cmp-input').value = data.cmp;
+      document.getElementById('atm-strike-input').value = data.atm_strike;
+      document.getElementById('start-date-display').textContent = data.start_date;
+
+      // ✅ Date cleanup fix
+      const minDateStr = data.min_date.split('T')[0];
+      const maxDateStr = data.max_date.split('T')[0];
+      const startDateStr = (startDate || data.min_date).split('T')[0];
+      const endDateStr = (endDate || data.max_date).split('T')[0];
+
+      startInput.min = minDateStr;
+      startInput.max = maxDateStr;
+      startInput.value = startDateStr;
+
+      endInput.min = minDateStr;
+      endInput.max = maxDateStr;
+      endInput.value = endDateStr;
+
+      document.getElementById('days-to-expiry').textContent = data.days_to_expiry;
+      document.getElementById('days-to-expiry-input').value = data.days_to_expiry;
+    } catch (err) {
+      console.error("❌ Failed to restore session", err);
+    } finally {
+      loader.style.display = 'none';
+    }
+  }
+
+  await populateStockCodes();
+
+  const cmpValue = document.getElementById('cmp-input').value;
+const atmValue = document.getElementById('atm-strike-input').value;
+const sessionStart = sessionStorage.getItem('start_date');
+const sessionEnd = sessionStorage.getItem('end_date');
+const sessionStock = sessionStorage.getItem('stock_code');
+const sessionExpiry = sessionStorage.getItem('expiry_date');
+
+console.log("[INIT] Value Check:");
+console.log("cmp-input:", cmpValue);
+console.log("atm-strike-input:", atmValue);
+console.log("start_date from session:", sessionStart);
+console.log("end_date from session:", sessionEnd);
+console.log("stock_code from session:", sessionStock);
+console.log("expiry_date from session:", sessionExpiry);
+
+if (cmpValue && atmValue && sessionStart && sessionEnd && sessionStock && sessionExpiry) {
+  console.log("[INIT] All values present, skipping restore");
+
+  stockSelect.value = sessionStock;
+
+  // ✅ Populate expiry dropdown before setting value
+  const expiryRes = await fetch(`${backendBaseUrl}/api/get-expiry-dates/?stock_code=${sessionStock}`, {
+    headers: { Authorization: `Token ${authToken}` }
+  });
+  const expiryData = await expiryRes.json();
+  expirySelect.innerHTML = '<option value="">-- Select Expiry Date --</option>';
+  expiryData.expiry_dates.forEach(item => {
+    const opt = document.createElement('option');
+    opt.value = item.raw;
+    opt.textContent = item.display;
+    expirySelect.appendChild(opt);
+  });
+  expirySelect.value = sessionExpiry;
+
+  try {
+    // ✅ New logic: Fetch min/max from get-stock-info instead of cache/session
+    const stockInfoRes = await fetch(`${backendBaseUrl}/api/get-stock-info/?stock_code=${sessionStock}`, {
+      headers: { Authorization: `Token ${authToken}` }
+    });
+    const stockInfo = await stockInfoRes.json();
+    const minDateStr = stockInfo.min_date.split('T')[0];
+    const maxDateStr = stockInfo.max_date.split('T')[0];
+    startInput.min = minDateStr;
+    startInput.max = maxDateStr;
+    endInput.min = minDateStr;
+    endInput.max = maxDateStr;
+    console.log("[INIT] Applied min/max from /get-stock-info/:", minDateStr, maxDateStr);
+  } catch (err) {
+    console.error("❌ Failed to fetch stock min/max via /get-stock-info/", err);
+  }
+
+  // ✅ Then apply the actual session values
+  startInput.value = sessionStart;
+  endInput.value = sessionEnd;
+
+} else {
+  console.log("[INIT] Some values missing, restoring session state");
+  await restoreLastSessionState();
+}
+
+
+  stockSelect.addEventListener('change', async () => {
+    const stockCode = stockSelect.value;
+    if (!stockCode) return;
+
+    console.log("[StockChange] Stock changed to:", stockCode);
+    sessionStorage.setItem('stock_code', stockCode);
+    sessionStorage.removeItem('expiry_date');
+    sessionStorage.removeItem('start_date');
+    sessionStorage.removeItem('end_date');
+
+    suppressExpiryChangeOnce = true;
+
+    expirySelect.innerHTML = '<option value="">-- Loading Expiry Dates --</option>';
+    loader.style.display = 'block';
+
+    document.getElementById('cmp').textContent = '-';
+    document.getElementById('atm-plus-10').textContent = '-';
+    document.getElementById('cmp-input').value = '';
+    document.getElementById('atm-strike-input').value = '';
+    document.getElementById('days-to-expiry').textContent = '-';
+    document.getElementById('days-to-expiry-input').value = '';
+    document.getElementById('start-date-display').textContent = '';
+    startInput.value = '';
+    endInput.value = '';
+
+    try {
+      const expiryRes = await fetch(`${backendBaseUrl}/api/get-expiry-dates/?stock_code=${stockCode}`, {
+        headers: { Authorization: `Token ${authToken}` }
+      });
+      const expiryData = await expiryRes.json();
+      expirySelect.innerHTML = '<option value="">-- Select Expiry Date --</option>';
+      expiryData.expiry_dates.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item.raw;
+        opt.textContent = item.display;
+        expirySelect.appendChild(opt);
+      });
+
+      const firstExpiry = expiryData.expiry_dates[0]?.raw;
+      expirySelect.value = firstExpiry;
+      sessionStorage.setItem('expiry_date', firstExpiry);
+
+      console.log("[StockChange] Fetching analysis for", stockCode, "@", firstExpiry);
+      const analysisRes = await fetch(`${backendBaseUrl}/api/get-analysis-inputs/?stock_code=${stockCode}&expiry_date=${firstExpiry}&session_token=${sessionToken}`, {
+        headers: { Authorization: `Token ${authToken}` }
+      });
+      const data = await analysisRes.json();
+
+      stockDataCache[stockCode] = {
+        cmp: data.cmp,
+        atm_strike: data.atm_strike,
+        min_date: data.min_date,
+        max_date: data.max_date,
+        start_date_display: data.start_date,
+      };
+
+      document.getElementById('cmp').textContent = data.cmp;
+      document.getElementById('atm-plus-10').textContent = data.atm_strike;
+      document.getElementById('cmp-input').value = data.cmp;
+      document.getElementById('atm-strike-input').value = data.atm_strike;
+      document.getElementById('start-date-display').textContent = data.start_date;
+
+      const minDateStr = data.min_date.split('T')[0];
+      const maxDateStr = data.max_date.split('T')[0];
+
+      startInput.min = minDateStr;
+      startInput.max = maxDateStr;
+      startInput.value = minDateStr;
+
+      endInput.min = minDateStr;
+      endInput.max = maxDateStr;
+      endInput.value = maxDateStr;
+
+      document.getElementById('days-to-expiry').textContent = data.days_to_expiry;
+      document.getElementById('days-to-expiry-input').value = data.days_to_expiry;
+    } catch (err) {
+      console.error("❌ Error fetching stock data", err);
+    } finally {
+      loader.style.display = 'none';
+    }
+  });
+
+  expirySelect.addEventListener('change', async () => {
+    if (suppressExpiryChangeOnce) {
+      suppressExpiryChangeOnce = false;
+      return;
+    }
+
+    const stockCode = stockSelect.value;
+    const expiryDate = expirySelect.value;
+    if (!stockCode || !expiryDate) return;
+
+    console.log("[ExpiryChange] Updating for", stockCode, "expiry:", expiryDate);
+    sessionStorage.setItem('expiry_date', expiryDate);
+    loader.style.display = 'block';
+
+    try {
+      const res = await fetch(`${backendBaseUrl}/api/get-analysis-inputs/?stock_code=${stockCode}&expiry_date=${expiryDate}&session_token=${sessionToken}`, {
+        headers: { Authorization: `Token ${authToken}` }
+      });
+      const data = await res.json();
+      document.getElementById('days-to-expiry').textContent = data.days_to_expiry;
+      document.getElementById('days-to-expiry-input').value = data.days_to_expiry;
+    } catch (err) {
+      console.error("❌ Failed to update Days to Expiry", err);
+    } finally {
+      loader.style.display = 'none';
+    }
+  });
+
+  function validateDateRange() {
+    const startDate = new Date(startInput.value);
+    const endDate = new Date(endInput.value);
+    const minDate = new Date(startInput.min);
+    const maxDate = new Date(startInput.max);
+
+    if (startDate < minDate || startDate > maxDate) {
+      alert(`Start date must be between ${startInput.min} and ${startInput.max}`);
+      startInput.value = startInput.min;
+    }
+
+    if (endDate < minDate || endDate > maxDate) {
+      alert(`End date must be between ${endInput.min} and ${endInput.max}`);
+      endInput.value = endInput.max;
+    }
+
+    if (startDate > endDate) {
+      alert("Start date cannot be after end date.");
+      startInput.value = endInput.value;
+    }
+  }
+
+  startInput.addEventListener('change', validateDateRange);
+  endInput.addEventListener('change', validateDateRange);
+
+  form.addEventListener('submit', function (e) {
+    const start = new Date(startInput.value);
+    const end = new Date(endInput.value);
+    const min = new Date(startInput.min);
+    const max = new Date(startInput.max);
+
+    if (start < min || start > max || end < min || end > max || start > end) {
+      alert("Fix the start/end dates before submitting.");
+      e.preventDefault();
+      return;
+    }
+
+    sessionStorage.setItem('stock_code', stockSelect.value);
+    sessionStorage.setItem('expiry_date', expirySelect.value);
+    sessionStorage.setItem('start_date', startInput.value);
+    sessionStorage.setItem('end_date', endInput.value);
+  });
+});
+</script>
+
+</body>
+</html>

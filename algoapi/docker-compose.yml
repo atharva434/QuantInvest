@@ -1,0 +1,29 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:13
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_DB: algotrading
+      POSTGRES_USER: atharvapurohit
+      POSTGRES_PASSWORD: 1234
+
+  web:
+    build: .
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py apply_sql_procs &&
+             python manage.py runserver 0.0.0.0:8001"
+    volumes:
+      - .:/code
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

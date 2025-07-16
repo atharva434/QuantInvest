@@ -1,0 +1,9 @@
+.env
+.scripts_ran
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+db.sqlite3
+media/
